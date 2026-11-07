@@ -8,15 +8,15 @@ import {
 } from '../../../common/packets/ConnectServerPackets';
 import { useEventBus } from '../../../hooks/useEventBus';
 import { CS_HOST } from '../../../consts';
-import { ServerItem } from './ServerItem';
+
+// thegame: o servidor tem um único game server. Não há tela de escolher servidor:
+// assim que o connect server manda a lista, o cliente pede a conexão do primeiro
+// (menor ServerId) e segue direto para o login.
 
 export const ServersPage = observer(() => {
-  const hasAnyServer = Store.serverList.length > 0;
-
-  const onConnectClick = async (serverId: number) => {
+  const requestConnection = (serverId: number) => {
     const packet = ConnectionInfoRequestPacket.createPacket();
     packet.ServerId = serverId;
-
     Store.sendToCS(packet.buffer);
   };
 
@@ -24,6 +24,9 @@ export const ServersPage = observer(() => {
     const p = new ServerListResponsePacket(bytes);
     const servers = p.getServers(p.ServerCount);
     Store.serverList = servers;
+
+    const first = [...servers].sort((a, b) => a.ServerId - b.ServerId)[0];
+    if (first) requestConnection(first.ServerId);
   });
 
   useEventBus('ConnectionInfo', async bytes => {
@@ -37,21 +40,7 @@ export const ServersPage = observer(() => {
 
   return (
     <div className="servers-page">
-      {!hasAnyServer ? (
-        <span>Conectando ao servidor…</span>
-      ) : (
-        <div className="list">
-          <h2 className="title">Escolha um servidor</h2>
-          {Store.serverList.map(s => (
-            <ServerItem
-              key={s.ServerId}
-              name={`Servidor ${s.ServerId + 1}`}
-              load={s.LoadPercentage}
-              onClick={() => onConnectClick(s.ServerId)}
-            />
-          ))}
-        </div>
-      )}
+      <span>Conectando ao servidor…</span>
     </div>
   );
 });

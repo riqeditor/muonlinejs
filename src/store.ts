@@ -380,6 +380,9 @@ export const Store = new (class _Store {
   /** thegame: movimento de item aguardando a resposta do servidor (C3 24). */
   pendingItemMove: { fromSlot: number; toSlot: number } | null = null;
 
+  /** thegame: menu do Esc (trocar de personagem / sair). */
+  escMenuOpen = false;
+
   /** thegame: tela "Carregando mapa…" enquanto o mapa e as texturas carregam. */
   mapLoading = false;
 
@@ -431,6 +434,7 @@ export const Store = new (class _Store {
       sendChatMessage: action,
       playerDead: observable,
       mapLoading: observable,
+      escMenuOpen: observable,
       heldItemSlot: observable,
       skills: observable,
       selectedSkill: observable,
@@ -779,6 +783,12 @@ export const Store = new (class _Store {
       (extraTargetId >> 8) & 0xff, extraTargetId & 0xff,
       areaSkillAnimationCounter,
     ]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C3 F1 02 LogOut: 0 = fechar o jogo, 1 = voltar à seleção de personagem. */
+  sendLogout(type: 0 | 1): void {
+    const bytes = new Uint8Array([0xc3, 5, 0xf1, 0x02, type]);
     this.sendToGS(new DataView(bytes.buffer));
   }
 

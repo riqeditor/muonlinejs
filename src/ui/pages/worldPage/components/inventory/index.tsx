@@ -209,12 +209,7 @@ export const Inventory = observer(() => {
         Store.heldItemSlot = null;
       });
     }
-    if (key === 'Escape') {
-      runInAction(() => {
-        Store.heldItemSlot = null;
-        Store.heldItemDragging = false;
-      });
-    }
+    // Escape é tratado no menu do Esc (escMenu): cancela o item na mão / fecha o inventário.
   });
 
   if (!Store.inventoryEnabled) {

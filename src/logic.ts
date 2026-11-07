@@ -1101,6 +1101,44 @@ EventBus.on('ItemDropResponse', packet => {
   Store.syncPlayerAppearance();
 });
 
+// thegame: C3 F1 02 LogoutResponse. Também chega quando o servidor manda o jogador de
+// volta à seleção de personagem (ex.: depois do reset).
+EventBus.on('LogoutResponse', packet => {
+  const type = packet.byteLength > 4 ? packet.getUint8(4) : 0;
+  if (type === 1) {
+    leaveWorldToCharacterSelection();
+  } else {
+    // Fechar o jogo / voltar à seleção de servidor: recomeça do zero.
+    location.reload();
+  }
+});
+
+/** Sai do mundo e volta para a seleção de personagem, limpando o que estava na tela. */
+function leaveWorldToCharacterSelection() {
+  const world = Store.world;
+  if (world) {
+    for (const e of [...world.netObjsQuery.entities]) {
+      if (!e.objOutOfScope) world.addComponent(e, 'objOutOfScope', true);
+    }
+    world.attackTargetNetId = null;
+    world.pickupTargetNetId = null;
+    world.pendingSkill = null;
+    EventBus.emit('requestWarp', { map: ENUM_WORLD.WD_55LOGINSCENE });
+  }
+  runInAction(() => {
+    Store.escMenuOpen = false;
+    Store.playerDead = false;
+    Store.inventoryEnabled = false;
+    Store.heldItemSlot = null;
+    Store.heldItemDragging = false;
+    Store.skills = [];
+    Store.selectedSkill = null;
+    Store.mapLoading = false;
+    Store.focusedChar = '';
+    Store.uiState = UIState.Characters;
+  });
+}
+
 EventBus.on('ItemMoved', onItemMoveResponse);
 EventBus.on('ItemMoveRequestFailed', onItemMoveResponse);
 
