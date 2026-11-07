@@ -4,6 +4,17 @@ import { Scalar } from '../../libs/babylon/exports';
 import { Store } from '../../store';
 import type { ISystemFactory } from '../world';
 
+/** thegame: altura do chão onde o modelo é desenhado (posição + posOffset). */
+export function groundHeightAt(
+  world: { getTerrainHeight: (x: number, y: number) => number },
+  transform: { pos: { x: number; z: number }; posOffset?: { x: number; z: number } }
+): number {
+  return world.getTerrainHeight(
+    transform.pos.x + (transform.posOffset?.x ?? 0),
+    transform.pos.z + (transform.posOffset?.z ?? 0)
+  );
+}
+
 export const MoveAlongPathSystem: ISystemFactory = world => {
   const query = world.with('transform', 'pathfinding', 'movement');
 
@@ -37,6 +48,11 @@ export const MoveAlongPathSystem: ISystemFactory = world => {
           movement.velocity.x = 0;
           movement.velocity.y = 0;
 
+          // thegame: parado também fica exatamente no chão (ex.: outro jogador que
+          // chegou já parado numa rampa ficava com os pés enterrados).
+          if (world.terrain) {
+            transform.pos.y = groundHeightAt(world, transform);
+          }
           continue;
         }
 
@@ -72,28 +88,10 @@ export const MoveAlongPathSystem: ISystemFactory = world => {
           transform.pos.z += deltaY;
 
           if (world.terrain) {
-            const h1 = world.getTerrainHeight(
-              ~~transform.pos.x,
-              ~~transform.pos.z
-            );
-            const h2 = world.getTerrainHeight(
-              ~~transform.pos.x,
-              ~~transform.pos.z
-            );
-            const h3 = world.getTerrainHeight(
-              ~~transform.pos.x + 1,
-              ~~transform.pos.z
-            );
-            const h4 = world.getTerrainHeight(
-              ~~transform.pos.x + 1,
-              ~~transform.pos.z + 1
-            );
-            const h = Scalar.Lerp(
-              Scalar.Lerp(h1, h2, 0.5),
-              Scalar.Lerp(h3, h4, 0.5),
-              0.5
-            );
-            // thegame: o fator nunca pode passar de 1, senão a interpolação extrapola.
+            // thegame: altura do chão no ponto exato onde o modelo é desenhado (posição +
+            // posOffset), com interpolação bilinear. Antes era uma média de cantos do
+            // quadrado sem o offset, e numa rampa os pés afundavam no chão.
+            const h = groundHeightAt(world, transform);
             transform.pos.y = Scalar.Lerp(
               transform.pos.y,
               h,

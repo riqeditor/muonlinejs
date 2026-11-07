@@ -10,8 +10,11 @@ import { isAttackable } from './combatSystem';
 import { CLICK_PICKUP_RADIUS, findGroundItemNear } from './pickupSystem';
 
 const MOVE_DELAY = 0.25;
-/** thegame: até quantos quadrados do personagem dá para jogar um item no chão. */
-const DROP_RANGE = 3;
+/**
+ * thegame: até quantos quadrados do personagem dá para jogar um item no chão. O OpenMU não
+ * limita a distância (só exige quadrado andável); 15 cobre a tela inteira.
+ */
+const DROP_RANGE = 15;
 
 export const PlayerControllerSystem: ISystemFactory = world => {
   const query = world.with('playerMoveTo', 'transform', 'pathfinding');
@@ -81,7 +84,7 @@ export const PlayerControllerSystem: ISystemFactory = world => {
   // O menu do navegador no botão direito atrapalha o jogo.
   scene.getEngine().getRenderingCanvas()?.addEventListener('contextmenu', e => e.preventDefault());
 
-  /** Joga o item "na mão" no chão onde está o cursor (ou ao lado do personagem, se longe). */
+  /** Joga o item "na mão" no chão onde está o cursor (ou aos pés do personagem, se ali não for andável). */
   function dropHeldItemOnGround() {
     const player = world.playerEntity;
     const slot = Store.heldItemSlot;
