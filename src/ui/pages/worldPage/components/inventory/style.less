@@ -264,3 +264,27 @@
 .inventory .held .item-icon {
   opacity: 0.3;
 }
+
+// thegame: descrição completa do item.
+.inventory .tooltip-content.item-description {
+  position: fixed;
+  transform: translate(-105%, -10%);
+  min-width: 14rem;
+  max-width: 20rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(8, 8, 8, 0.95);
+  border: 1px solid #5a4a2a;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+  z-index: 50;
+  white-space: normal;
+
+  .item-name {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+}

@@ -6,7 +6,7 @@ import { Store } from '../../../../../store';
 import { ItemIcon } from '../../../../components/itemIcon';
 import { useEventBus } from '../../../../../hooks/useEventBus';
 import { Item } from '../../../../../ecs/world';
-import { ItemsDatabase } from '../../../../../common/itemsDatabase';
+import { describeItem } from '../../../../../common/itemDescription';
 import { InventoryConstants as IC } from '../../../../../common/inventoryConstants';
 import {
   BAG_COLUMNS,
@@ -112,8 +112,8 @@ const HeldItemCursor = observer(() => {
 });
 
 const ItemTooltip = ({ item, children }: { item: Item | null; children: React.ReactNode }) => {
-  const config = item ? ItemsDatabase.getItem(item.group, item.num) : null;
   const [isVisible, setIsVisible] = useState(false);
+  const lines = item && isVisible ? describeItem(item) : [];
 
   return (
     <div
@@ -122,13 +122,13 @@ const ItemTooltip = ({ item, children }: { item: Item | null; children: React.Re
       onPointerLeave={() => setIsVisible(false)}
     >
       {children}
-      {!!config && isVisible && (
-        <div className="tooltip-content" style={{ left: 0, top: 0 }}>
-          <div className="tooltip-content-name">
-            {config.ItemName}
-            {item?.lvl ? ` +${item.lvl}` : ''}
-          </div>
-          <div className="tooltip-content-hint">Clique: mover · Botão direito: equipar/desequipar</div>
+      {lines.length > 0 && Store.heldItemSlot === null && (
+        <div className="tooltip-content item-description">
+          {lines.map((line, i) => (
+            <div key={i} className={i === 0 ? 'item-name' : 'item-line'} style={{ color: line.color }}>
+              {line.text}
+            </div>
+          ))}
         </div>
       )}
     </div>

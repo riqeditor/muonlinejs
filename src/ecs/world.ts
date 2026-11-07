@@ -23,6 +23,14 @@ export type Item = {
   lvl?: number;
   isExcellent?: boolean;
   hasSkill?: boolean;
+  /** thegame: opções lidas dos 12 bytes do item (ItemSerializer.DeserializeItem). */
+  hasLuck?: boolean;
+  /** Nível do adicional (0–7): +4 de dano/defesa por nível, ou % de recuperação em anéis/colares. */
+  optionLevel?: number;
+  /** Bits das opções excelentes (0..63). */
+  excellentBits?: number;
+  durability?: number;
+  isAncient?: boolean;
 };
 
 export type Entity = Partial<{

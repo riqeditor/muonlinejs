@@ -114,7 +114,14 @@ export class ItemSerializer {
 
     item.lvl = castToByte((array[1] & LevelMask) >> 3);
 
-    // item.Durability = array[2];
+    // thegame: as opções seguem o mesmo formato do OpenMU (GameServer/RemoteView/ItemSerializer.cs).
+    item.durability = array[2];
+    item.hasSkill = (array[1] & SkillFlag) !== 0;
+    item.hasLuck = (array[1] & LuckFlag) !== 0;
+    item.optionLevel = (array[1] & 3) + ((array[3] >> 4) & 4);
+    item.excellentBits = array[3] & 0x3f;
+    item.isExcellent = item.excellentBits !== 0;
+    item.isAncient = (array[4] & 0x0f) !== 0;
 
     // if (item.Definition.PossibleItemOptions.Any(o =>
     //         o.PossibleOptions.Any(i => i.OptionType == ItemOptionTypes.Excellent)))
