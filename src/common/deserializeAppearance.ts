@@ -120,6 +120,25 @@ export function deserializeAppearance(app: DataView) {
 
   // this.AddPet(target, itemArray[InventoryConstants.PetSlot]);
 
+  // thegame: brilho e excelente das peças (OpenMU AppearanceSerializer.SetItemLevels/SetArmorPiece).
+  // Bytes 6-8: 7 peças x 3 bits de "nível de brilho" (= (nível - 1) / 2), na ordem
+  // mão esquerda, mão direita, elmo, armadura, calça, luva, bota.
+  // Byte 10: excelente das peças de armadura (0x80 elmo, 0x40 armadura, 0x20 calça, 0x10 luva, 0x08 bota).
+  if (app.byteLength >= 11) {
+    const levelIndex = (app.getUint8(6) << 16) | (app.getUint8(7) << 8) | app.getUint8(8);
+    const excellentByte = app.getUint8(10);
+    const pieces = [leftHand, rightHand, helm, armor, pants, gloves, boots] as (Item | null)[];
+    const excellentMasks = [0, 0, 0x80, 0x40, 0x20, 0x10, 0x08];
+    pieces.forEach((piece, i) => {
+      if (!piece) return;
+      const glow = (levelIndex >> (i * 3)) & 0x07;
+      piece.lvl = glow > 0 ? glow * 2 + 1 : 0;
+      if (excellentMasks[i] && (excellentByte & excellentMasks[i]) !== 0) {
+        (piece as Item & { isExcellent?: boolean }).isExcellent = true;
+      }
+    });
+  }
+
   return {
     cls,
     leftHand,
