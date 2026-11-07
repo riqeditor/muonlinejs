@@ -6,6 +6,7 @@ import {
   Xor3Byte,
 } from './common';
 import {
+  ClientReadyAfterMapChangePacket,
   CreateCharacterPacket,
   FocusCharacterPacket,
   LoginShortPasswordPacket,
@@ -649,6 +650,14 @@ export const Store = new (class _Store {
     console.log(`select character [${name}]`);
     this.characterName = name;
     this.sendToGS(selectCharacterPacket.buffer);
+  }
+
+  /**
+   * C1 F3 12: avisa o servidor que o mapa terminou de carregar depois de um MapChanged.
+   * Só então o OpenMU coloca o jogador de volta no mapa e envia monstros/NPCs/jogadores.
+   */
+  sendClientReadyAfterMapChange(): void {
+    this.sendToGS(ClientReadyAfterMapChangePacket.createPacket().buffer);
   }
 
   addChatMessage(kind: ChatEntryKind, text: string, sender?: string): void {

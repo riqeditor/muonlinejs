@@ -12,7 +12,6 @@ import {
   PlayerAction,
   ServerPlayerActionType,
 } from './common/objects/enum';
-import { HelloPacket } from './common/packets/ConnectServerPackets';
 import {
   AddCharactersToScopePacket,
   AddNpcsToScopePacket,
@@ -24,6 +23,7 @@ import {
   GameServerEnteredPacket,
   ItemDropRemovedPacket,
   ItemsDroppedPacket,
+  MapChangedPacket,
   MapObjectOutOfScopePacket,
   ObjectMovedPacket,
   ObjectAnimationPacket,
@@ -116,11 +116,10 @@ export function spawnPlayer(
   return playerEntity;
 }
 
-let serverListRequested = false;
-EventBus.on('Hello', packet => {
-  const p = new HelloPacket(packet);
-  if (serverListRequested) return;
-  serverListRequested = true;
+// thegame: pede a lista a cada conexão com o connect server. Antes havia uma trava
+// "só na primeira vez" e, ao voltar para a tela de servidores sem recarregar a página,
+// a lista nunca mais carregava.
+EventBus.on('Hello', () => {
   Store.updateServerListRequest();
 });
 
@@ -417,6 +416,51 @@ EventBus.on('MapObjectOutOfScope', packet => {
       world.addComponent(objEntity, 'objOutOfScope', true);
     }
   });
+});
+
+// thegame: C3 1C 0F MapChanged. O servidor mudou o jogador de mapa ou o teleportou
+// (ex.: comando "/move" de GM, portais). Antes ninguém tratava esse pacote e a tela
+// ficava num lugar enquanto o servidor estava em outro.
+EventBus.on('MapChanged', packet => {
+  const p = new MapChangedPacket(packet);
+  const world = Store.world;
+  if (!world) return;
+
+  const map = p.MapNumber as ENUM_WORLD;
+  const pos = { x: p.PositionX, y: p.PositionY };
+  console.log(`MapChanged: mapa ${map}, posição ${pos.x}, ${pos.y}`);
+
+  const player = world.playerEntity;
+  if (player) {
+    player.pathfinding.path = [];
+    player.pathfinding.calculated = true;
+    player.playerMoveTo.handled = true;
+    player.playerMoveTo.sendToServer = false;
+    player.transform.rot.y = convertDirectionToAngle(p.Rotation);
+  }
+
+  if (map !== world.mapIndex) {
+    // Outro mapa: carrega o mapa novo e, quando terminar, avisa o servidor (C1 F3 12),
+    // que só então manda o que está em volta.
+    pendingReadyAfterMapChange = map;
+    EventBus.emit('requestWarp', { map, pos });
+    return;
+  }
+
+  // Mesmo mapa: só move o jogador e avisa o servidor na hora.
+  if (player) {
+    player.transform.pos.x = pos.x;
+    player.transform.pos.z = pos.y;
+    player.transform.pos.y = world.getTerrainHeight(pos.x, pos.y);
+  }
+  Store.sendClientReadyAfterMapChange();
+});
+
+let pendingReadyAfterMapChange: ENUM_WORLD | null = null;
+EventBus.on('warpCompleted', ({ map }) => {
+  if (pendingReadyAfterMapChange !== map) return;
+  pendingReadyAfterMapChange = null;
+  Store.sendClientReadyAfterMapChange();
 });
 
 // thegame: C1 15 ObjectMoved. O servidor manda quando um objeto (inclusive o próprio
