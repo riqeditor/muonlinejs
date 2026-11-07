@@ -678,6 +678,12 @@ export const Store = new (class _Store {
     this.sendToGS(packet.buffer);
   }
 
+  /** C3 22 PickupItemRequest: pega o item/zen `itemId` do chão. */
+  sendPickupItem(itemId: number): void {
+    const bytes = new Uint8Array([0xc3, 5, 0x22, (itemId >> 8) & 0xff, itemId & 0xff]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
   addDamagePopup(netId: number, text: string, color: string): void {
     const popup: DamagePopup = { id: ++damagePopupCounter, netId, text, color };
     this.damagePopups.push(popup);

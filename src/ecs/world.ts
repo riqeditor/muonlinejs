@@ -62,6 +62,8 @@ export type Entity = Partial<{
   };
   /** thegame: objeto morto (ObjectGotKilled); não pode ser atacado e mantém a animação de morte. */
   dead: true;
+  /** thegame: item (ou zen) caído no chão, que pode ser pego (C3 22 PickupItemRequest). */
+  groundItem: { isMoney: boolean };
   monsterAnimation: {
     action: MonsterActionType;
     /** thegame: até este instante (gameTime em s) ataque/golpe não volta para parado. */
@@ -157,6 +159,8 @@ export class World extends ECSWorld<Entity> {
   currentPointerTarget: Entity | null = null;
   /** thegame: netId do monstro que o jogador local está atacando (null = nenhum). */
   attackTargetNetId: number | null = null;
+  /** thegame: netId do item no chão que o jogador local vai pegar (null = nenhum). */
+  pickupTargetNetId: number | null = null;
 
   pointerPressed = false;
 

@@ -6,6 +6,7 @@ import {
 import type { ISystemFactory } from '../world';
 import { Store } from '../../store';
 import { isAttackable } from './combatSystem';
+import { CLICK_PICKUP_RADIUS, findGroundItemNear } from './pickupSystem';
 
 const MOVE_DELAY = 0.25;
 
@@ -64,6 +65,7 @@ export const PlayerControllerSystem: ISystemFactory = world => {
     const target = world.currentPointerTarget;
     if (isAttackable(target)) {
       world.attackTargetNetId = target!.netId!;
+      world.pickupTargetNetId = null;
       return;
     }
     world.attackTargetNetId = null;
@@ -85,6 +87,14 @@ export const PlayerControllerSystem: ISystemFactory = world => {
 
     const x = ~~point.x;
     const z = ~~point.z;
+
+    // thegame: clique em cima (ou ao lado) de um item no chão = pegar o item.
+    const item = findGroundItemNear(world, point.x, point.z, CLICK_PICKUP_RADIUS);
+    if (item?.netId !== undefined) {
+      world.pickupTargetNetId = item.netId;
+      return;
+    }
+    world.pickupTargetNetId = null;
 
     if (!world.isWalkable(x, z)) return;
 

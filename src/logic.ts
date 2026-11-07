@@ -42,7 +42,7 @@ import {
 } from './common/packets/ServerToClientPackets';
 import { ServerToClientActionMap } from './common/playerActionMapper';
 import { PlayerObject } from './common/playerObject';
-import { Entity, World } from './ecs/world';
+import { Entity, World, type Item } from './ecs/world';
 import { createAttributeSystem } from './libs/attributeSystem';
 import { Vector3 } from './libs/babylon/exports';
 import { EventBus } from './libs/eventBus';
@@ -803,101 +803,42 @@ function onRespawnAfterDeath(packet: DataView) {
 EventBus.on('RespawnAfterDeath075', onRespawnAfterDeath);
 EventBus.on('RespawnAfterDeath095', onRespawnAfterDeath);
 
+// thegame: C2 20 ItemsDropped. Itens/zen caídos no chão: cria o objeto com o modelo
+// (quando existe), o nome visível e a marca `groundItem` para poder ser pego.
 EventBus.on('ItemsDropped', packet => {
   const world = Store.world;
-
   if (!world) return;
 
   const p = new ItemsDroppedPacket(packet);
-  console.log(`ItemsDropped: ${p.ItemCount} items dropped`, p);
 
   p.getItems(p.ItemCount).forEach(item => {
     const maskedId = item.Id & 0x7fff;
-    console.log(item);
     const data = item.ItemData;
+    if (data.byteLength < 6) return;
 
-    const id = data.getUint8(0); //[9]
+    const id = data.getUint8(0);
     const group = data.getUint8(5) >> 4;
-
-    const isMoney = data.byteLength >= 6 && id === 15 && group === 14; // Money is ItemGroup 14, ItemId 15
+    const level = (data.getUint8(1) >> 3) & 0x0f;
+    const isMoney = id === 15 && group === 14; // Zen = grupo 14, item 15
 
     const itemConfig = ItemsDatabase.getItem(group, id);
 
-    console.log(itemConfig);
-
-    let dropObj;
-
+    let name: string;
     if (isMoney) {
-      const amount =
-        (data.getUint8(1) << 16) | (data.getUint8(2) << 8) | data.getUint8(4);
-      // const amount = data.byteLength >= 5 ? data.getUint8(4) : 0;
-
-      // dropObj = new MoneyScopeObject(maskedId, rawId, x, y, amount);
-      // _scopeManager.AddOrUpdateMoneyInScope(maskedId, rawId, x, y, amount);
-      console.log(`Dropped Money: Amount=${amount}, ID=${maskedId}`);
-
-      // Schedule on main thread for visual update and sound
-      // MuGame.ScheduleOnMainThread(async () =>
-      // {
-      //     if (MuGame.Instance.ActiveScene?.World is not WalkableWorldControl w) return;
-      //     // Remove existing visual object if it's already there (e.g., from a previous packet re-send)
-      //     var existing = w.Objects.OfType<DroppedItemObject>().FirstOrDefault(d => d.NetworkId == maskedId);
-      //     if (existing != null)
-      //     {
-      //         w.Objects.Remove(existing);
-      //         existing.Dispose();
-      //     }
-      //     // Create and add the new visual object
-      //     var obj = new DroppedItemObject(dropObj, _characterState.Id, _networkManager.GetCharacterService(), _loggerFactory.CreateLogger<DroppedItemObject>());
-      //     w.Objects.Add(obj); // Add the object to the world's objects collection
-      //     await obj.Load(); // Ensure its assets are loaded
-
-      //     SoundController.Instance.PlayBufferWithAttenuation("Sound/pDropMoney.wav", obj.Position, w.Walker.Position); // Play money drop sound
-      //     // Initial visibility check (hide if too far or out of view initially)
-      //     obj.Hidden = !w.IsObjectInView(obj);
-      //     _logger.LogDebug($"Spawned dropped money ({obj.DisplayName}) at {obj.Position.X},{obj.Position.Y},{obj.Position.Z}. RawId: {obj.RawId:X4}, MaskedId: {obj.NetworkId:X4}");
-      // });
+      const amount = (data.getUint8(1) << 16) | (data.getUint8(2) << 8) | data.getUint8(4);
+      name = `${amount.toLocaleString('pt-BR')} Zen`;
     } else {
-      // dropObj = new ItemScopeObject(maskedId, rawId, x, y, data.ToArray());
-      // _scopeManager.AddOrUpdateItemInScope(maskedId, rawId, x, y, data.ToArray());
-      console.log(`Dropped Item: DataLen=${data.byteLength}, ID=${maskedId}`);
-
-      // Schedule on main thread for visual update and sound
-      // MuGame.ScheduleOnMainThread(async () =>
-      // {
-      //     if (MuGame.Instance.ActiveScene?.World is not WalkableWorldControl w) return;
-      //     // Remove existing visual object if it's already there
-      //     var existing = w.Objects.OfType<DroppedItemObject>().FirstOrDefault(d => d.NetworkId == maskedId);
-      //     if (existing != null)
-      //     {
-      //         w.Objects.Remove(existing);
-      //         existing.Dispose();
-      //     }
-
-      //     // Play drop sound based on item type (Jewel vs. Generic)
-      //     byte[] dataCopy = item.ItemData.ToArray(); // Create a defensive copy
-      //     string itemName = ItemDatabase.GetItemName(dataCopy) ?? string.Empty;
-
-      //     var obj = new DroppedItemObject(dropObj, _characterState.Id, _networkManager.GetCharacterService(), _loggerFactory.CreateLogger<DroppedItemObject>());
-      //     w.Objects.Add(obj); // Add the object to the world's objects collection
-      //     await obj.Load(); // Ensure its assets are loaded
-
-      //     if (itemName.StartsWith("Jewel", StringComparison.OrdinalIgnoreCase))
-      //     {
-      //         SoundController.Instance.PlayBufferWithAttenuation("Sound/pGem.wav", obj.Position, w.Walker.Position); // Play jewel drop sound
-      //     }
-      //     else
-      //     {
-      //         SoundController.Instance.PlayBufferWithAttenuation("Sound/pDropItem.wav", obj.Position, w.Walker.Position); // Play generic item drop sound
-      //     }
-      //     // Initial visibility check
-      //     obj.Hidden = !w.IsObjectInView(obj);
-      //     _logger.LogDebug($"Spawned dropped item ({obj.DisplayName}) at {obj.Position.X},{obj.Position.Y},{obj.Position.Z}. RawId: {obj.RawId:X4}, MaskedId: {obj.NetworkId:X4}");
-      // });
+      name = `${itemConfig?.ItemName ?? `Item ${group}/${id}`}${level > 0 ? ` +${level}` : ''}`;
     }
+
+    removeExistingNetObject(world, maskedId);
 
     world.add({
       netId: maskedId,
+      worldIndex: world.mapIndex,
+      groundItem: { isMoney },
+      objectNameInWorld: name,
+      screenPosition: { worldOffsetZ: 0.6, x: 0, y: 0 },
       transform: {
         pos: new Vector3(
           item.PositionX,
@@ -908,10 +849,64 @@ EventBus.on('ItemsDropped', packet => {
         scale: 1,
       },
       modelFactory: ModelObject,
-      modelFilePath: itemConfig.szModelFolder + itemConfig.szModelName,
+      ...(itemConfig
+        ? { modelFilePath: itemConfig.szModelFolder + itemConfig.szModelName }
+        : {}),
     });
   });
 });
+
+// thegame: respostas do C3 22 (pegar item). O OpenMU usa o mesmo código para três
+// mensagens e o cliente lê todas como ItemAddedToInventory; aqui elas são separadas:
+// - 8 bytes com FE no byte 3: InventoryMoneyUpdate (zen atual, big endian);
+// - 4 bytes: ItemPickUpRequestFailed (motivo no byte 3; 253 = empilhou, não é erro);
+// - o resto: ItemAddedToInventory (slot no byte 3, dados do item a partir do byte 4).
+function onPickupResponse(packet: DataView) {
+  const playerData = Store.playerData;
+  const localId = Store.world?.playerEntity?.netId;
+
+  if (packet.byteLength === 8 && packet.getUint8(3) === 0xfe) {
+    const money = packet.getUint32(4, false);
+    const gained = money - playerData.money;
+    runInAction(() => {
+      playerData.money = money;
+      if (gained > 0 && localId !== undefined) {
+        Store.addDamagePopup(localId, `+${gained.toLocaleString('pt-BR')} Zen`, '#ffd75e');
+      }
+    });
+    return;
+  }
+
+  if (packet.byteLength <= 4) {
+    const reason = packet.byteLength === 4 ? packet.getUint8(3) : 255;
+    if (reason !== 253) {
+      runInAction(() =>
+        Store.addChatMessage('system', 'Não foi possível pegar o item (inventário cheio?).')
+      );
+    }
+    return;
+  }
+
+  const slot = packet.getUint8(3);
+  const itemBytes = new Uint8Array(packet.buffer, packet.byteOffset + 4, packet.byteLength - 4);
+  let parsed: Item;
+  try {
+    parsed = ItemSerializer.DeserializeItem(itemBytes);
+  } catch (error) {
+    console.error('Item recebido não pôde ser lido', error);
+    return;
+  }
+
+  const name = ItemsDatabase.getItem(parsed.group, parsed.num)?.ItemName ?? 'Item';
+  runInAction(() => {
+    playerData.items[slot] = parsed;
+    Store.addChatMessage('system', `Você pegou: ${name}${parsed.lvl ? ` +${parsed.lvl}` : ''}`);
+  });
+  Store.syncPlayerAppearance();
+}
+EventBus.on('ItemAddedToInventory', onPickupResponse);
+EventBus.on('ItemPickUpRequestFailed', onPickupResponse);
+EventBus.on('InventoryMoneyUpdate', onPickupResponse);
 
 EventBus.on('ItemDropRemoved', packet => {
   const world = Store.world;
