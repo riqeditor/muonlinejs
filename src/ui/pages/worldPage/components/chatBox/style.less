@@ -1,0 +1,69 @@
+.chat-box {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 215px;
+  width: min(26rem, calc(100vw - 1rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  pointer-events: none;
+  font-size: 13px;
+  text-shadow: 0 1px 2px #000;
+
+  .messages {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0.5rem;
+    max-height: 9.5rem;
+    overflow-y: auto;
+    border-radius: 4px;
+    color: #f0f0f0;
+
+    li {
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .sender {
+      font-weight: 600;
+    }
+
+    .whisper,
+    .whisper-sent {
+      color: #ff9ad5;
+    }
+
+    .system {
+      color: #ffd75e;
+    }
+  }
+
+  &.open .messages {
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.55);
+  }
+
+  form {
+    pointer-events: auto;
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.4rem 0.5rem;
+      font-size: 13px;
+      border: 1px solid #5a4a2a;
+      border-radius: 4px;
+      background: rgba(10, 10, 10, 0.85);
+      color: #fff;
+      outline: none;
+    }
+  }
+
+  .open-button {
+    pointer-events: auto;
+    align-self: flex-start;
+    padding: 0.2rem 0.6rem;
+    font-size: 12px;
+    opacity: 0.75;
+  }
+}

@@ -10,6 +10,7 @@ import { TestScene } from './scenes/testScene';
 import { loadMapIntoScene } from './libs/mu/loadMapIntoScene';
 import { createWorld } from './ecs/createWorld';
 import { ENUM_WORLD } from './common';
+import { isTypingInField } from './common/utf8';
 import { EventBus } from './libs/eventBus';
 import { SoundsManager } from './libs/soundsManager';
 
@@ -33,6 +34,8 @@ try {
 
 //some tricks for scrolling
 window.addEventListener('keydown', ev => {
+  // thegame: não bloqueia espaço/setas quando o usuário está digitando (chat, login).
+  if (isTypingInField(ev.target)) return;
   if (['ArrowDown', 'ArrowUp', ' '].includes(ev.key)) {
     ev.preventDefault();
   }

@@ -20,6 +20,7 @@ import {
 } from './common/packets/ConnectServerPackets';
 import { CharacterListPacket } from './common/packets/ServerToClientPackets';
 import { stringToBytes } from './common/utils';
+import { encodeUtf8 } from './common/utf8';
 import {
   CLIENT_VERSION,
   CS_HOST,
@@ -282,6 +283,41 @@ class PlayerData {
   }
 }
 
+/** normal = jogador; whisper = sussurro recebido; whisper-sent = sussurro enviado; system = aviso. */
+export type ChatEntryKind = 'normal' | 'whisper' | 'whisper-sent' | 'system';
+
+export type ChatEntry = {
+  id: number;
+  kind: ChatEntryKind;
+  sender?: string;
+  text: string;
+};
+
+const MAX_CHAT_MESSAGES = 50;
+/** Limite de bytes da mensagem: o pacote C1 tem tamanho de 1 byte (até 255 no total). */
+const MAX_CHAT_MESSAGE_BYTES = 100;
+let chatMessageCounter = 0;
+
+/**
+ * Monta C1 00 PublicChatMessage ou C1 02 WhisperMessage:
+ * [C1, tamanho, código, nome (10 bytes), mensagem UTF-8, 0].
+ */
+function buildChatPacket(code: 0x00 | 0x02, name: string, message: string): DataView {
+  const nameBytes = encodeUtf8(name, 10);
+  const messageBytes = encodeUtf8(message, MAX_CHAT_MESSAGE_BYTES);
+  const length = 3 + 10 + messageBytes.length + 1;
+
+  const bytes = new Uint8Array(length);
+  bytes[0] = 0xc1;
+  bytes[1] = length;
+  bytes[2] = code;
+  bytes.set(nameBytes, 3);
+  bytes.set(messageBytes, 13);
+  // O último byte já é 0 (fim do texto).
+
+  return new DataView(bytes.buffer);
+}
+
 export type NotificationType = 'info' | 'error';
 
 export type Notification = {
@@ -313,6 +349,12 @@ export const Store = new (class _Store {
   unlockFlags = 0;
   characterCreationError?: string;
   characterCreationProcessing = false;
+
+  /** Nome do personagem escolhido para entrar no jogo (usado no chat). */
+  characterName = '';
+  chatMessages: ChatEntry[] = [];
+  chatOpen = false;
+  chatInput = '';
 
   playerData = new PlayerData();
 
@@ -349,6 +391,12 @@ export const Store = new (class _Store {
       unlockFlags: observable,
       characterCreationError: observable,
       characterCreationProcessing: observable,
+      characterName: observable,
+      chatMessages: observable,
+      chatOpen: observable,
+      chatInput: observable,
+      addChatMessage: action,
+      sendChatMessage: action,
       playerData: observable,
       notifications: observable,
       world: observable,
@@ -599,7 +647,41 @@ export const Store = new (class _Store {
     selectCharacterPacket.setName(name);
 
     console.log(`select character [${name}]`);
+    this.characterName = name;
     this.sendToGS(selectCharacterPacket.buffer);
+  }
+
+  addChatMessage(kind: ChatEntryKind, text: string, sender?: string): void {
+    this.chatMessages.push({ id: ++chatMessageCounter, kind, text, sender });
+    if (this.chatMessages.length > MAX_CHAT_MESSAGES) {
+      this.chatMessages.splice(0, this.chatMessages.length - MAX_CHAT_MESSAGES);
+    }
+  }
+
+  /**
+   * Envia o texto digitado no chat.
+   * - "/w Nome mensagem": sussurro (C1 02 WhisperMessage).
+   * - qualquer outro texto, inclusive comandos "/..." do OpenMU: C1 00 PublicChatMessage.
+   */
+  sendChatMessage(rawText: string): void {
+    const text = rawText.trim();
+    if (!text) return;
+
+    const whisper = /^\/w\s+(\S+)\s+([\s\S]+)$/i.exec(text);
+    if (whisper) {
+      const [, receiver, message] = whisper;
+      this.sendToGS(buildChatPacket(0x02, receiver, message));
+      this.addChatMessage('whisper-sent', message, receiver);
+      return;
+    }
+
+    if (/^\/w(\s|$)/i.test(text)) {
+      this.addChatMessage('system', 'Para sussurrar use: /w Nome mensagem');
+      return;
+    }
+
+    // O servidor devolve a mensagem para todos por perto, inclusive quem enviou.
+    this.sendToGS(buildChatPacket(0x00, this.characterName, text));
   }
 
   createCharacterRequest(name: string, charClass: CharacterClassNumber): void {

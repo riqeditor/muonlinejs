@@ -1,10 +1,13 @@
 import { EventBus } from '../../libs/eventBus';
 import type { ISystemFactory } from '../world';
+import { isTypingInField } from '../../common/utf8';
 
 export const KeyboardInputSystem: ISystemFactory = world => {
   const pressedKeys = new Set<string>();
 
   document.addEventListener('keydown', e => {
+    // thegame: teclas digitadas no chat/login não são atalhos do jogo.
+    if (isTypingInField(e.target)) return;
     if (!pressedKeys.has(e.code)) {
       EventBus.emit('keyPressed', e.code);
     }

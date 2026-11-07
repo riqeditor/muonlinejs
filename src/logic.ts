@@ -1,6 +1,7 @@
 import { runInAction } from 'mobx';
 import { CharacterClassNumber, ENUM_WORLD } from './common';
 import { deserializeAppearance } from './common/deserializeAppearance';
+import { decodeUtf8 } from './common/utf8';
 import { ItemsDatabase } from './common/itemsDatabase';
 import { ItemSerializer } from './common/itemSerializer';
 import { ModelFactoryPerId } from './common/modelFactoryPerId';
@@ -17,7 +18,7 @@ import {
   AddNpcsToScopePacket,
   CharacterInformationPacket,
   CharacterInventoryPacket,
-  ChatMessagePacket,
+  ChatMessageChatMessageTypeEnum,
   CurrentHealthAndShieldPacket,
   CurrentManaAndAbilityPacket,
   GameServerEnteredPacket,
@@ -493,11 +494,20 @@ EventBus.on('ObjectWalked', packet => {
   );
 });
 
+// thegame: C1 00 (normal) / C1 02 (sussurro) ChatMessage. Texto em UTF-8, como o OpenMU envia.
 EventBus.on('ChatMessage', packet => {
-  const p = new ChatMessagePacket(packet);
-  console.log(
-    `ChatMessage: ${p.Type}, sender:${p.Sender}, msg: ${p.Message}`,
-    p
+  const type = packet.getUint8(2);
+  const sender = decodeUtf8(packet, 3, 13);
+  const message = decodeUtf8(packet, 13);
+
+  console.log(`ChatMessage: ${type}, sender:${sender}, msg: ${message}`);
+
+  runInAction(() =>
+    Store.addChatMessage(
+      type === ChatMessageChatMessageTypeEnum.Whisper ? 'whisper' : 'normal',
+      message,
+      sender
+    )
   );
 });
 
@@ -699,8 +709,16 @@ EventBus.on('ServerMessage', packet => {
       break;
   }
 
+  // thegame: mensagem do servidor (C1 0D) vai para a caixa de chat como aviso.
+  // O OpenMU prefixa o texto com "000000000" (campos numéricos do formato do cliente
+  // original, que ele mostra sem esses dígitos).
+  const message = decodeUtf8(packet, 4).replace(/^0{9}/, '');
   console.log(
-    `%cServerMessage: ${p.Message}`,
+    `%cServerMessage: ${message}`,
     `color: ${color}; font-weight: bold; font-size: 1em;`
   ); // print message with color
+
+  if (message) {
+    runInAction(() => Store.addChatMessage('system', message));
+  }
 });

@@ -1,6 +1,7 @@
 import { EventBus } from "../eventBus";
 import { ConnectServerPackets, ServerToClientPackets, SimpleModulusDecryptor } from "../../common";
 import { byteToString, getPacketSize, getSizeOfPacketType } from "../../common/utils";
+import { CS_PORT } from "../../consts";
 
 type Options = {
   wsAddress: string;
@@ -21,6 +22,13 @@ STCPackets.forEach(p => {
     packetsCacheByCode[code].push(p);
   }
 });
+
+// thegame: no ChatMessage (C1 00) o "código" do pacote é o próprio tipo da mensagem:
+// 0x00 = normal e 0x02 = sussurro. As definições geradas só conhecem 0x00, e o 0x02
+// está ocupado pelo PatchVersionOkay do connect server. Nas conexões com o game server
+// (que nunca envia PatchVersionOkay), C1 02 é tratado como ChatMessage.
+const CHAT_MESSAGE_DEF = (packetsCacheByCode[0x00] ?? []).find(p => p.Name === 'ChatMessage');
+const CONNECT_SERVER_PORTS = new Set([CS_PORT, 44406]);
 
 const HEADERS = new Set<number>([0xc1, 0xc2, 0xc3, 0xc4]);
 
@@ -102,8 +110,13 @@ export function createSocket({ wsAddress, tcpIP, tcpPort }: Options) {
     const packetCode = packet.getUint8(codeIndex);
     const subCode = packet.byteLength > codeIndex + 1 ? packet.getUint8(codeIndex + 1) : undefined;
 
+    const isWhisperFromGameServer =
+      packetType === 0xc1 && packetCode === 0x02 && !CONNECT_SERVER_PORTS.has(tcpPort);
+
     const packetsByCode = packetsCacheByCode[packetCode];
-    const pDef = packetsByCode?.find(p => p.SubCode == null || p.SubCode === subCode);
+    const pDef = isWhisperFromGameServer
+      ? CHAT_MESSAGE_DEF
+      : packetsByCode?.find(p => p.SubCode == null || p.SubCode === subCode);
 
     if (!pDef) {
       // Mensagem que este cliente ainda não conhece: ignora e segue para a próxima.
