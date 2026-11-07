@@ -308,6 +308,10 @@ export const Store = new (class _Store {
   newCharName: string = '';
   newCharClass: CharacterClassNumber = CharacterClassNumber.DarkKnight;
   focusedChar: string = '';
+  /** Classes extras liberadas para a conta (CharacterCreationUnlockFlagsEnum). */
+  unlockFlags = 0;
+  characterCreationError?: string;
+  characterCreationProcessing = false;
 
   playerData = new PlayerData();
 
@@ -341,6 +345,9 @@ export const Store = new (class _Store {
       newCharName: observable,
       newCharClass: observable,
       focusedChar: observable,
+      unlockFlags: observable,
+      characterCreationError: observable,
+      characterCreationProcessing: observable,
       playerData: observable,
       notifications: observable,
       world: observable,
@@ -456,7 +463,12 @@ export const Store = new (class _Store {
     }
 
     this.username = this.config.username ?? '';
-    this.password = this.config.password ?? '';
+
+    // thegame: a senha não é mais guardada no navegador. Apaga a de versões antigas.
+    if (this.config.password !== undefined) {
+      delete this.config.password;
+      this.saveConfig();
+    }
   }
 
   saveConfig(): void {
@@ -466,7 +478,7 @@ export const Store = new (class _Store {
   saveLoginData(): void {
     const c = this.config;
     c.username = this.username;
-    c.password = this.password;
+    // thegame: só o nome de usuário é guardado; a senha nunca vai para o navegador.
     this.saveConfig();
   }
 

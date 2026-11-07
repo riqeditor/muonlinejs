@@ -38,13 +38,14 @@ export const ServersPage = observer(() => {
   return (
     <div className="servers-page">
       {!hasAnyServer ? (
-        <span>Loading...</span>
+        <span>Conectando ao servidor…</span>
       ) : (
         <div className="list">
+          <h2 className="title">Escolha um servidor</h2>
           {Store.serverList.map(s => (
             <ServerItem
               key={s.ServerId}
-              name={`Server ${s.ServerId}`}
+              name={`Servidor ${s.ServerId + 1}`}
               load={s.LoadPercentage}
               onClick={() => onConnectClick(s.ServerId)}
             />

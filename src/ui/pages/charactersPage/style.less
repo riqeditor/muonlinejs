@@ -1,27 +1,131 @@
 .characters-page {
-  margin: 0.7rem 0.75rem;
-  display: grid;
-  place-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  color: #e8e8e8;
 
-  .list {
+  .loading {
+    align-self: center;
+  }
+
+  .panel {
     pointer-events: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    width: min(20rem, 100%);
+    padding: 1.25rem 1.5rem;
+    border: 1px solid #5a4a2a;
+    border-radius: 8px;
+    background: rgba(10, 10, 10, 0.85);
 
-    .focused {
-      background-color: gray;
+    h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1.2rem;
+      color: #d8b25a;
     }
   }
 
-  .actions {
-    margin: 0.7rem 0.75rem;
+  .empty {
+    margin: 0;
+    color: #9a9a9a;
+  }
+
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    li {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 0.25rem;
+      border-radius: 6px;
+    }
+
+    li.focused {
+      background: rgba(216, 178, 90, 0.15);
+    }
+
+    .character {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100%;
+      text-align: left;
+    }
+
+    .name {
+      font-weight: 600;
+    }
+
+    .details {
+      font-size: 0.85rem;
+      color: #b0b0b0;
+    }
+
+    .tag {
+      margin-left: 0.4rem;
+      padding: 0 0.3rem;
+      font-size: 0.7rem;
+      border-radius: 3px;
+      background: #d8b25a;
+      color: #111;
+    }
+
+    .tag.banned {
+      background: #c0392b;
+      color: #fff;
+    }
+
+    .enter {
+      background: #6b5420;
+    }
   }
 
   form {
-    pointer-events: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.25;
+    gap: 0.75rem;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.9rem;
+      color: #c8c8c8;
+    }
+
+    input,
+    select {
+      padding: 0.5rem 0.6rem;
+      font-size: 1rem;
+      border: 1px solid #555;
+      border-radius: 4px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .hint {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #8a8a8a;
+  }
+
+  .error {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #ff6b6b;
   }
 }
