@@ -24,6 +24,7 @@ import {
   ItemDropRemovedPacket,
   ItemsDroppedPacket,
   MapObjectOutOfScopePacket,
+  ObjectMovedPacket,
   ObjectAnimationPacket,
   ObjectGotKilledPacket,
   ObjectWalkedPacket,
@@ -365,6 +366,42 @@ EventBus.on('MapObjectOutOfScope', packet => {
       world.addComponent(objEntity, 'objOutOfScope', true);
     }
   });
+});
+
+// thegame: C1 15 ObjectMoved. O servidor manda quando um objeto (inclusive o próprio
+// jogador) muda de posição na hora: correção depois de um pedido de andar recusado,
+// teleporte, etc. A posição do servidor manda: cancela o caminho e coloca o objeto lá.
+EventBus.on('ObjectMoved', packet => {
+  const p = new ObjectMovedPacket(packet);
+
+  const world = Store.world;
+  if (!world) return;
+
+  const maskedId = p.ObjectId & 0x7fff;
+  const obj = world.netObjsQuery.entities.find(e => e.netId === maskedId);
+  if (!obj) return;
+
+  const x = p.PositionX;
+  const y = p.PositionY;
+
+  if (obj.pathfinding) {
+    obj.pathfinding.path = [];
+    obj.pathfinding.calculated = true;
+  }
+  if (obj.playerMoveTo) {
+    obj.playerMoveTo.handled = true;
+    obj.playerMoveTo.sendToServer = false;
+  }
+
+  obj.transform.pos.x = x;
+  obj.transform.pos.z = y;
+  if (world.terrain) {
+    obj.transform.pos.y = world.getTerrainHeight(x, y);
+  }
+
+  if (obj.localPlayer) {
+    console.log(`Posição corrigida pelo servidor: ${x}, ${y}`);
+  }
 });
 
 EventBus.on('ObjectWalked', packet => {

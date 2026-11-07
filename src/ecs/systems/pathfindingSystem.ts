@@ -6,7 +6,7 @@ import {
 } from '../../libs/babylon/exports';
 import type { ISystemFactory, World } from '../world';
 import { TERRAIN_SIZE } from '../../common/terrain/consts';
-import { DEBUG_PATHFINDING } from '../../consts';
+import { DEBUG_PATHFINDING, MAX_WALK_STEPS } from '../../consts';
 import { EventBus } from '../../libs/eventBus';
 
 export const PathfindingSystem: ISystemFactory = world => {
@@ -48,13 +48,21 @@ export const PathfindingSystem: ISystemFactory = world => {
         }
       }
 
-      for (const { pathfinding } of query) {
+      for (const { pathfinding, localPlayer } of query) {
         if (pathfinding.calculated) continue;
 
         pathfinding.path = world.pathfinder.search(
           pathfinding.from,
           pathfinding.to
         );
+
+        // thegame: o pedido de andar leva no máximo MAX_WALK_STEPS passos. O jogador local
+        // anda só esse trecho para ficar igual ao servidor; segurando o botão do mouse,
+        // o PlayerControllerSystem pede o próximo trecho a cada 0,25 s.
+        // path[0] é o ponto de partida, por isso o +1.
+        if (localPlayer && pathfinding.path.length > MAX_WALK_STEPS + 1) {
+          pathfinding.path.length = MAX_WALK_STEPS + 1;
+        }
 
         pathfinding.calculated = true;
 

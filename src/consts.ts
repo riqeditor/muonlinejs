@@ -4,6 +4,8 @@ export const MAX_PASSWORD_LENGTH = 10;
 export const CHARACTER_NAME_REGEX = /^[a-zA-Z0-9]{3,10}$/;
 export const MIN_CHARACTER_NAME_LENGTH = 3;
 export const MAX_CHARACTER_NAME_LENGTH = 10;
+/** Máximo de passos num pedido de andar (C1 D4): a quantidade vai em 4 bits. */
+export const MAX_WALK_STEPS = 15;
 export const CLIENT_VERSION = [49, 48, 52, 48, 52];
 
 export const CS_HOST = '127.0.0.1';

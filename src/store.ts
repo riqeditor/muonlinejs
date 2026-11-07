@@ -26,6 +26,7 @@ import {
   CS_PORT,
   MAX_PASSWORD_LENGTH,
   MAX_USERNAME_LENGTH,
+  MAX_WALK_STEPS,
   WS_HOST,
   WS_PORT,
 } from './consts';
@@ -609,37 +610,32 @@ export const Store = new (class _Store {
     this.sendToGS(packet.buffer);
   }
 
+  /**
+   * Envia o pedido de andar (C1 D4 WalkRequest) no formato que o OpenMU lê
+   * (CharacterWalkBaseHandlerPlugIn.DecodePayload):
+   * - byte 3/4: posição de origem;
+   * - byte 5: quantidade de passos (4 bits baixos) e direção final (4 bits altos);
+   * - a partir do byte 6: as direções, duas por byte (1ª nos 4 bits altos).
+   * Cada direção é 0..7 (o servidor soma 1 para chegar no enum Direction).
+   */
   sendWalkPath(x: number, y: number, dirs: number[]): void {
-    const packet = WalkRequestPacket.createPacket(6 + dirs.length);
-    packet.SourceX = x;
-    packet.SourceY = y;
-    packet.StepCount = dirs.length;
+    const stepCount = Math.min(dirs.length, MAX_WALK_STEPS);
+    if (stepCount === 0) return;
 
-    function SetStepData(steps: number[], stepsSize: number) {
-      if (stepsSize === 0) return;
-
-      const result = new Array<number>(stepsSize);
-
-      result[0] = ((steps[0] << 4) | stepsSize) & 0xff;
-      for (let i = 0; i < stepsSize - 1; i += 2) {
-        const index = 1 + i / 2;
-        const firstStep = steps[i];
-        const secondStep = steps.length > i + 1 ? steps[i + 1] : 0;
-        result[index] = ((firstStep << 4) | secondStep) & 0xff;
-      }
-
-      return result;
+    const directionBytes = new Array<number>(Math.ceil(stepCount / 2)).fill(0);
+    for (let i = 0; i < stepCount; i++) {
+      const dir = dirs[i] & 0x0f;
+      const index = i >> 1;
+      directionBytes[index] |= i % 2 === 0 ? dir << 4 : dir;
     }
 
-    const newDirs = SetStepData(dirs, dirs.length);
-    if (!newDirs) return;
-
-    packet.setDirections(newDirs, newDirs.length);
+    const packet = WalkRequestPacket.createPacket(6 + directionBytes.length);
+    packet.SourceX = x;
+    packet.SourceY = y;
+    packet.StepCount = stepCount;
+    packet.TargetRotation = dirs[stepCount - 1] & 0x0f;
+    packet.setDirections(directionBytes, directionBytes.length);
 
     this.sendToGS(packet.buffer);
-
-    // console.log(
-    //   `send walk path from [${x}, ${y}] steps: ${newDirs.join('->')}`
-    // );
   }
 })();

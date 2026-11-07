@@ -29,11 +29,24 @@ export const PlayerControllerSystem: ISystemFactory = world => {
 
   let lastClientX = 0;
   let lastClientY = 0;
+  // thegame: um clique (ou toque) rápido pode começar e terminar entre dois frames,
+  // e aí `world.pointerPressed` nunca é visto como true. Guarda o clique para o próximo frame.
+  let pendingClick = false;
 
   scene.onPointerObservable.add(ev => {
-    if (ev.type === PointerEventTypes.POINTERMOVE) {
+    if (
+      ev.type === PointerEventTypes.POINTERMOVE ||
+      ev.type === PointerEventTypes.POINTERDOWN
+    ) {
       lastClientX = ev.event.clientX;
       lastClientY = ev.event.clientY;
+    }
+
+    if (
+      ev.type === PointerEventTypes.POINTERDOWN &&
+      (ev.event as PointerEvent).button === 0
+    ) {
+      pendingClick = true;
     }
   });
 
@@ -74,7 +87,11 @@ export const PlayerControllerSystem: ISystemFactory = world => {
     update: dt => {
       delay -= dt;
 
-      if (world.pointerPressed) {
+      if (pendingClick) {
+        pendingClick = false;
+        delay = MOVE_DELAY;
+        tryMove();
+      } else if (world.pointerPressed) {
         if (delay <= 0) {
           delay = MOVE_DELAY;
           tryMove();
