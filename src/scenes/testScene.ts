@@ -22,7 +22,8 @@ export class TestScene extends Scene {
       'ArcRotateCamera',
       -Math.PI / 4,
       Math.PI / 4.5,
-      10,
+      // thegame: 30% mais longe que o original (10); a rodinha do mouse ajusta (CameraFollowSystem).
+      13,
       new Vector3(0, 0, 0),
       this
     );

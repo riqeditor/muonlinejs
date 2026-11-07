@@ -615,6 +615,9 @@ EventBus.on('ObjectAnimation', packet => {
   obj.transform.rot.y = convertDirectionToAngle(p.Direction);
 });
 
+/** Tempo até o corpo do monstro sumir (ms). */
+const CORPSE_REMOVE_DELAY_MS = 1800;
+
 /** Duração (s) de animações de ataque/golpe vindas do servidor. */
 const ACTION_ANIMATION_TIME = 0.6;
 const SHOCK_ANIMATION_TIME = 0.35;
@@ -692,6 +695,17 @@ EventBus.on('ObjectGotKilled', packet => {
     obj.monsterAnimation.action = MonsterActionType.Die;
   } else if (obj.playerAnimation) {
     obj.playerAnimation.action = PlayerAction.PLAYER_DIE1;
+  }
+
+  // thegame: monstro morto some depois da animação de queda. Antes o corpo ficava
+  // parado no lugar (e voltava a ficar de pé). O OpenMU reenvia o monstro quando
+  // ele renasce (AddNpcsToScope), como um objeto novo.
+  if (obj.npcType !== undefined) {
+    setTimeout(() => {
+      if (obj.dead && !obj.objOutOfScope && Store.world?.has(obj)) {
+        Store.world.addComponent(obj, 'objOutOfScope', true);
+      }
+    }, CORPSE_REMOVE_DELAY_MS);
   }
 
   if (obj.localPlayer) {

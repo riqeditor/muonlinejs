@@ -5,7 +5,6 @@ import { MapsList } from './components/mapsList';
 import { BottomBar } from './components/bottomBar';
 import { CharacterInfo } from './components/characterInfo';
 import { Inventory } from './components/inventory';
-import { Skills } from './components/skills';
 import { ChatBox } from './components/chatBox';
 import { CombatOverlay } from './components/combatOverlay';
 
@@ -17,7 +16,7 @@ const HUD = observer(() => {
         <Inventory />
         <CharacterInfo />
       </div>
-      <Skills />
+      {/* thegame: botões de magia fixos de teste (Flame/Energy Ball) escondidos até a tarefa de habilidades por classe. */}
       <MapsList />
       <ChatBox />
     </div>
