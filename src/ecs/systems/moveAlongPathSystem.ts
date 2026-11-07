@@ -93,7 +93,12 @@ export const MoveAlongPathSystem: ISystemFactory = world => {
               Scalar.Lerp(h3, h4, 0.5),
               0.5
             );
-            transform.pos.y = Scalar.Lerp(transform.pos.y, h, 15 * deltaTime);
+            // thegame: o fator nunca pode passar de 1, senão a interpolação extrapola.
+            transform.pos.y = Scalar.Lerp(
+              transform.pos.y,
+              h,
+              Math.min(1, 15 * deltaTime)
+            );
 
             if (attributeSystem) {
               const flag = world.getTerrainFlag(

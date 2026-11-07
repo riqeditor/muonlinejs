@@ -296,8 +296,15 @@ EventBus.on('AddNpcsToScope', packet => {
 
     npcEntity.attributeSystem.setValue('isFemale', 0);
     npcEntity.attributeSystem.setValue('isFlying', 0);
+    // thegame: sem isso a velocidade ficava 0 e os monstros nunca andavam na tela,
+    // mesmo recebendo ObjectWalked. O cliente não tem o MoveDelay de cada monstro;
+    // a maioria no OpenMU usa 0,4 s por passo = 2,5 quadrados/s.
+    npcEntity.attributeSystem.setValue('totalMovementSpeed', NPC_DEFAULT_MOVEMENT_SPEED);
   });
 });
+
+/** Quadrados por segundo (MoveDelay padrão de 0,4 s no OpenMU). */
+const NPC_DEFAULT_MOVEMENT_SPEED = 2.5;
 
 /**
  * thegame: se o servidor manda de novo um objeto que já está na tela (ele saiu e voltou

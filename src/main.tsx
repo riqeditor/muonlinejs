@@ -98,11 +98,16 @@ Store.world = world;
 (window as any).__scene = scene;
 (window as any).__world = world;
 
+const MAX_FRAME_DELTA_SECONDS = 0.1;
+
 let lastTime = performance.now();
 engine.runRenderLoop(() => {
   const now = performance.now();
 
-  const deltaTime = (now - lastTime) / 1000; // Convert to seconds
+  // thegame: limita o salto de tempo. Com a aba em segundo plano o navegador pausa
+  // os frames e, ao voltar, o delta virava vários segundos de uma vez, o que fazia
+  // contas de suavização "passarem do ponto" (personagem caindo para Y = -41000).
+  const deltaTime = Math.min((now - lastTime) / 1000, MAX_FRAME_DELTA_SECONDS);
   world.gameTime.TotalGameTime.TotalSeconds += deltaTime;
 
   updateSystems(deltaTime);
