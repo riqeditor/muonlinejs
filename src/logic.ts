@@ -207,8 +207,10 @@ EventBus.on('CurrentHealthAndShield', packet => {
   const playerEntity = Store.world?.playerEntity;
   if (!playerEntity) return;
   playerEntity.attributeSystem.setValue('currentHealth', p.Health);
-  Store.playerData.currentHP = Math.floor(p.Health);
-  Store.playerData.currentSD = Math.floor(p.Shield);
+  runInAction(() => {
+    Store.playerData.currentHP = Math.floor(p.Health);
+    Store.playerData.currentSD = Math.floor(p.Shield);
+  });
 });
 
 EventBus.on('CurrentManaAndAbility', packet => {
@@ -218,8 +220,10 @@ EventBus.on('CurrentManaAndAbility', packet => {
   if (!playerEntity) return;
 
   playerEntity.attributeSystem.setValue('currentMana', p.Mana);
-  Store.playerData.currentMP = Math.floor(p.Mana);
-  Store.playerData.currentAG = Math.floor(p.Ability);
+  runInAction(() => {
+    Store.playerData.currentMP = Math.floor(p.Mana);
+    Store.playerData.currentAG = Math.floor(p.Ability);
+  });
 });
 
 EventBus.on('AddNpcsToScope', packet => {

@@ -132,33 +132,14 @@ export function deserializeAppearance(app: DataView) {
   } as const;
 }
 
+// thegame: o OpenMU grava `CharacterClass.Number << 3` no 1º byte da aparência
+// (AppearanceSerializer.cs), então os 5 bits já são o CharacterClassNumber oficial.
+// O mapeamento antigo trocava algumas classes (ex.: 2 virava GrandMaster em vez de
+// SoulMaster) e não conhecia as classes de 3ª evolução.
 function ClassFromAppearance(raw: number): CharacterClassNumber {
-  switch (raw) {
-    case 0:
-      return CharacterClassNumber.DarkWizard;
-    case 1:
-      return CharacterClassNumber.SoulMaster;
-    case 2:
-      return CharacterClassNumber.GrandMaster;
-    case 4:
-      return CharacterClassNumber.DarkKnight;
-    case 6:
-      return CharacterClassNumber.BladeKnight;
-    case 8:
-      return CharacterClassNumber.FairyElf;
-    case 10:
-      return CharacterClassNumber.MuseElf;
-    case 12:
-      return CharacterClassNumber.MagicGladiator;
-    case 16:
-      return CharacterClassNumber.DarkLord;
-    case 20:
-      return CharacterClassNumber.Summoner;
-    case 24:
-      return CharacterClassNumber.RageFighter;
-    default:
-      return CharacterClassNumber.DarkWizard;
-  }
+  return raw in CharacterClassNumber
+    ? (raw as CharacterClassNumber)
+    : CharacterClassNumber.DarkWizard;
 }
 
 // function SetHand(preview:DataView,  indexIndex:number,  groupIndex:number){

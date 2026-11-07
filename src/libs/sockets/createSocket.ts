@@ -40,65 +40,78 @@ export function createSocket({ wsAddress, tcpIP, tcpPort }: Options) {
 
   let bytes = new Uint8Array(0);
 
-  function removePacketAndGoNext(length: number) {
-    bytes = bytes.slice(length);
+  // thegame: a fila processa uma mensagem por vez e NUNCA pode travar.
+  // Antes, uma mensagem desconhecida (ex.: C1 B2 1A, imposto do Castle Siege,
+  // enviada pelo OpenMU atual) lançava um erro e ficava presa no início da fila,
+  // bloqueando todas as seguintes (o "limbo" ao entrar no jogo).
+  function handlePacketsQueue() {
+    while (bytes.length > 0) {
+      const packetType = bytes[0];
 
-    if (bytes.byteLength > 0) {
-      handlePacketsQueue();
+      if (!HEADERS.has(packetType)) {
+        // Não é possível achar o início da próxima mensagem com segurança: descarta o que chegou.
+        console.error(
+          `${LOG_PREFIX}NOT_MU_PACKET: 0x${byteToString(packetType)}, descartando ${bytes.length} bytes`
+        );
+        bytes = new Uint8Array(0);
+        return;
+      }
+
+      const packetHeaderSize = getSizeOfPacketType(packetType);
+      // Precisa pelo menos do cabeçalho (tipo + tamanho) para saber o tamanho total.
+      if (bytes.length < packetHeaderSize) return;
+
+      const length = getPacketSize(bytes);
+      if (length < packetHeaderSize + 1) {
+        console.error(`${LOG_PREFIX}tamanho de pacote inválido (${length}), descartando a fila`);
+        bytes = new Uint8Array(0);
+        return;
+      }
+
+      // A mensagem ainda não chegou inteira (a rede pode dividi-la): espera o resto.
+      if (bytes.length < length) return;
+
+      const raw = bytes.slice(0, length);
+      bytes = bytes.slice(length);
+
+      processPacket(raw, packetType, packetHeaderSize);
     }
   }
 
-  function handlePacketsQueue() {
-    if (bytes.length < 1) return;
-    DEBUG_LOG && console.log(`${LOG_PREFIX}handlePacketsQueue: ${bytes.length} bytes in queue...`);
-
-    const packetType = bytes[0];
-
-    if (!HEADERS.has(packetType)) {
-      console.error(`${LOG_PREFIX}NOT_MU_PACKET: 0x${byteToString(packetType)}`);
-
-      //TODO
-      // WS protocol packets:
-      // 0x6B, 0x89
-      if (packetType === 0x89 || packetType === 0x6b) {
-        console.log(`${LOG_PREFIX}`, bytes);
-        // socket.send();//pong
-        return;
-      }
-    }
-
-    const packetHeaderSize = getSizeOfPacketType(packetType);
-
-    let packet = new DataView(bytes.buffer, 0, 3);
-    const length = getPacketSize(bytes);
-
-    packet = new DataView(bytes.buffer, 0, length);
+  function processPacket(raw: Uint8Array, packetType: number, packetHeaderSize: number) {
+    const length = raw.length;
+    let packet = new DataView(raw.buffer, 0, length);
     DEBUG_LOG && console.log(`${LOG_PREFIX}Try to find packet 0x${byteToString(packetType)}, lng: ${length}`);
 
     if (packetType >= 0xc3) {
-      const [s, decryptedPacket] = decryptor.Decrypt(new Uint8Array(packet.buffer, 0, length));
+      const [s, decryptedPacket] = decryptor.Decrypt(raw);
       if (!s) {
         console.error(`${LOG_PREFIX} can't decrypt packet`);
-        removePacketAndGoNext(length);
         return;
-      } else {
-        packet = new DataView(decryptedPacket.buffer);
-        DEBUG_LOG && console.log(`${LOG_PREFIX}Decrypted packet 0x${byteToString(packetType)}, lng: ${length}:`, decryptedPacket);
       }
+      packet = new DataView(decryptedPacket.buffer);
+      DEBUG_LOG && console.log(`${LOG_PREFIX}Decrypted packet 0x${byteToString(packetType)}, lng: ${length}:`, decryptedPacket);
     }
 
     const codeIndex = packetHeaderSize === 3 ? 3 : 2;
-    const packetCode = packet.getUint8(codeIndex);
+    if (packet.byteLength <= codeIndex) {
+      console.warn(`${LOG_PREFIX}pacote curto demais, ignorado`);
+      return;
+    }
 
-    const subCode = packet.getUint8(codeIndex + 1);
+    const packetCode = packet.getUint8(codeIndex);
+    const subCode = packet.byteLength > codeIndex + 1 ? packet.getUint8(codeIndex + 1) : undefined;
 
     const packetsByCode = packetsCacheByCode[packetCode];
-    const pDef = packetsByCode.find(p => p.SubCode == null || p.SubCode === subCode);
+    const pDef = packetsByCode?.find(p => p.SubCode == null || p.SubCode === subCode);
 
     if (!pDef) {
-      console.error(`${LOG_PREFIX}no packet: 0x` + byteToString(packetCode));
-      removePacketAndGoNext(length);
-
+      // Mensagem que este cliente ainda não conhece: ignora e segue para a próxima.
+      console.warn(
+        `${LOG_PREFIX}pacote desconhecido ignorado: 0x${byteToString(packetCode)}` +
+        (subCode !== undefined ? ` (0x${byteToString(subCode)})` : '') +
+        ` lng:${length}`
+      );
       return;
     }
 
@@ -107,9 +120,12 @@ export function createSocket({ wsAddress, tcpIP, tcpPort }: Options) {
       } lng:${length}`
     );
 
-    EventBus.emit(pDef.Name, packet);
-
-    removePacketAndGoNext(length);
+    try {
+      EventBus.emit(pDef.Name, packet);
+    } catch (error) {
+      // Um erro ao tratar uma mensagem não pode travar as próximas.
+      console.error(`${LOG_PREFIX}erro ao tratar ${pDef.Name}:`, error);
+    }
   }
 
   socket.addEventListener("message", (event) => {
