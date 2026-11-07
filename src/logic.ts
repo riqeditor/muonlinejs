@@ -918,6 +918,50 @@ function onPickupResponse(packet: DataView) {
   });
   Store.syncPlayerAppearance();
 }
+// thegame: C3 24 ItemMoved / C3 24 FF ItemMoveRequestFailed — resposta ao mover/equipar.
+// O ItemMoved não diz de onde o item saiu; o cliente guarda o pedido em Store.pendingItemMove.
+function onItemMoveResponse(packet: DataView) {
+  const pending = Store.pendingItemMove;
+  Store.pendingItemMove = null;
+  console.log(
+    `ItemMove resposta (${packet.byteLength} bytes): ` +
+      Array.from(new Uint8Array(packet.buffer, packet.byteOffset, packet.byteLength))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' '),
+    pending
+  );
+
+  if (packet.byteLength < 5 || packet.getUint8(3) === 0xff) {
+    runInAction(() => Store.addChatMessage('system', 'Não foi possível mover o item.'));
+    return;
+  }
+
+  const storage = packet.getUint8(3);
+  const targetSlot = packet.getUint8(4);
+  if (storage !== 0) return; // só o inventário por enquanto
+
+  let parsed: Item;
+  try {
+    parsed = ItemSerializer.DeserializeItem(
+      new Uint8Array(packet.buffer, packet.byteOffset + 5, packet.byteLength - 5)
+    );
+  } catch (error) {
+    console.error('Item movido não pôde ser lido', error);
+    return;
+  }
+
+  runInAction(() => {
+    const items = Store.playerData.items;
+    if (pending && pending.fromSlot !== targetSlot) {
+      items[pending.fromSlot] = null as unknown as Item;
+    }
+    items[targetSlot] = parsed;
+  });
+  Store.syncPlayerAppearance();
+}
+EventBus.on('ItemMoved', onItemMoveResponse);
+EventBus.on('ItemMoveRequestFailed', onItemMoveResponse);
+
 EventBus.on('ItemAddedToInventory', onPickupResponse);
 EventBus.on('ItemPickUpRequestFailed', onPickupResponse);
 EventBus.on('InventoryMoneyUpdate', onPickupResponse);

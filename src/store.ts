@@ -23,6 +23,8 @@ import {
 import { CharacterListPacket } from './common/packets/ServerToClientPackets';
 import { stringToBytes } from './common/utils';
 import { encodeUtf8 } from './common/utf8';
+import { findFreeInventorySlot, getEquipmentSlotFor } from './common/inventoryLayout';
+import { ItemSerializer } from './common/itemSerializer';
 import {
   CLIENT_VERSION,
   CS_HOST,
@@ -362,6 +364,11 @@ export const Store = new (class _Store {
   chatOpen = false;
   chatInput = '';
 
+  /** thegame: slot do item "na mão" (selecionado para mover) no inventário. */
+  heldItemSlot: number | null = null;
+  /** thegame: movimento de item aguardando a resposta do servidor (C3 24). */
+  pendingItemMove: { fromSlot: number; toSlot: number } | null = null;
+
   /** thegame: o jogador local morreu e espera o RespawnAfterDeath. */
   playerDead = false;
   /** thegame: números de dano flutuando sobre os personagens/monstros. */
@@ -409,6 +416,10 @@ export const Store = new (class _Store {
       addChatMessage: action,
       sendChatMessage: action,
       playerDead: observable,
+      heldItemSlot: observable,
+      sendItemMove: action,
+      equipItem: action,
+      unequipItem: action,
       damagePopups: observable,
       addDamagePopup: action,
       playerData: observable,
@@ -676,6 +687,56 @@ export const Store = new (class _Store {
     packet.AttackAnimation = ServerPlayerActionType.Attack1;
     packet.LookingDirection = direction;
     this.sendToGS(packet.buffer);
+  }
+
+  /**
+   * C3 24 ItemMoveRequest dentro do inventário (slots 0–11 = equipamento, 12–75 = mochila).
+   * O OpenMU só usa os slots (ItemMoveHandlerPlugIn); os 12 bytes do item vão por compatibilidade.
+   */
+  sendItemMove(fromSlot: number, toSlot: number): void {
+    const item = this.playerData.items[fromSlot];
+    if (!item || fromSlot === toSlot) return;
+
+    const bytes = new Uint8Array(19);
+    bytes[0] = 0xc3;
+    bytes[1] = 19;
+    bytes[2] = 0x24;
+    bytes[3] = 0; // ItemStorageKind.Inventory
+    bytes[4] = fromSlot;
+    try {
+      ItemSerializer.SerializeItem(bytes.subarray(5, 17), item);
+    } catch {
+      // Dados do item são ignorados pelo servidor; zeros servem.
+    }
+    bytes[17] = 0; // ItemStorageKind.Inventory
+    bytes[18] = toSlot;
+
+    this.pendingItemMove = { fromSlot, toSlot };
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** Equipa o item da mochila no slot de equipamento certo (clique direito). */
+  equipItem(fromSlot: number): void {
+    const item = this.playerData.items[fromSlot];
+    if (!item) return;
+    const target = getEquipmentSlotFor(item, this.playerData.items);
+    if (target === null) {
+      this.addChatMessage('system', 'Este item não pode ser equipado.');
+      return;
+    }
+    this.sendItemMove(fromSlot, target);
+  }
+
+  /** Desequipa para o primeiro espaço livre da mochila (clique direito no equipamento). */
+  unequipItem(fromSlot: number): void {
+    const item = this.playerData.items[fromSlot];
+    if (!item) return;
+    const target = findFreeInventorySlot(item, this.playerData.items, fromSlot);
+    if (target === null) {
+      this.addChatMessage('system', 'Não há espaço livre no inventário.');
+      return;
+    }
+    this.sendItemMove(fromSlot, target);
   }
 
   /** C3 22 PickupItemRequest: pega o item/zen `itemId` do chão. */
