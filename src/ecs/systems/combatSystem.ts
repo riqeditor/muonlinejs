@@ -1,6 +1,7 @@
 import { CharacterClassNumber } from '../../common';
 import { directionTo, directionToAngle, tileDistance } from '../../common/direction';
 import { MONSTER_MODELS } from '../../common/monsters/monsterModels';
+import { SKILL_DEFINITIONS, SkillKind } from '../../common/skills/skillDefinitions';
 import { PlayerAction } from '../../common/objects/enum';
 import { Store } from '../../store';
 import type { Entity, ISystemFactory, World } from '../world';
@@ -12,6 +13,8 @@ import type { Entity, ISystemFactory, World } from '../world';
 
 /** Tempo entre golpes (s). O OpenMU valida a velocidade de ataque; 0,7 s é seguro. */
 const ATTACK_INTERVAL = 0.7;
+/** Tempo mínimo entre habilidades (s). O servidor valida a velocidade de verdade. */
+const SKILL_INTERVAL = 0.8;
 /** Quanto tempo a animação de ataque fica travada (s). */
 const ATTACK_ANIMATION_TIME = 0.6;
 /** De quanto em quanto tempo recalcular o caminho até o alvo (s). */
@@ -45,10 +48,86 @@ export const CombatSystem: ISystemFactory = world => {
   let cooldown = 0;
   let repathTimer = 0;
 
+  /** Envia a habilidade pendente quando estiver no alcance (anda até lá se precisar). */
+  function updateSkill(dt: number): boolean {
+    const player = world.playerEntity;
+    const skill = world.pendingSkill;
+    if (!player || !skill) return false;
+
+    const def = SKILL_DEFINITIONS[skill.number];
+    if (!def || Store.playerDead) {
+      world.pendingSkill = null;
+      return false;
+    }
+    const [, type, defRange] = def;
+    const range = Math.max(1, defRange);
+
+    const isSelfCast =
+      type === SkillKind.Buff ||
+      type === SkillKind.Regeneration ||
+      type === SkillKind.SummonMonster ||
+      type === SkillKind.Other;
+
+    let tx = skill.x;
+    let ty = skill.y;
+    let target: Entity | undefined;
+    if (skill.targetNetId !== null) {
+      target = world.netObjsQuery.entities.find(e => e.netId === skill.targetNetId);
+      if (!target || !isAttackable(target)) {
+        world.pendingSkill = null;
+        return false;
+      }
+      tx = target.transform!.pos.x;
+      ty = target.transform!.pos.z;
+    }
+
+    const px = player.transform.pos.x;
+    const py = player.transform.pos.z;
+
+    if (!isSelfCast && tileDistance(px, py, tx, ty) > range) {
+      if (repathTimer <= 0) {
+        repathTimer = CHASE_REPATH_INTERVAL;
+        player.playerMoveTo.point.x = Math.floor(tx) + 0.5;
+        player.playerMoveTo.point.y = Math.floor(ty) + 0.5;
+        player.playerMoveTo.handled = false;
+        player.playerMoveTo.sendToServer = true;
+      }
+      return true;
+    }
+
+    if (player.pathfinding.path && player.pathfinding.path.length > 0) {
+      player.pathfinding.path = [];
+    }
+    if (cooldown > 0) return true;
+    cooldown = SKILL_INTERVAL;
+    world.pendingSkill = null;
+
+    const direction = isSelfCast ? 2 : directionTo(px, py, tx, ty);
+    if (!isSelfCast) player.transform.rot.y = directionToAngle(direction);
+
+    if (type === SkillKind.DirectHit && target?.netId !== undefined) {
+      Store.sendTargetedSkill(skill.number, target.netId);
+    } else if (isSelfCast) {
+      Store.sendTargetedSkill(skill.number, player.netId ?? 0);
+    } else {
+      Store.sendAreaSkill(skill.number, Math.floor(tx), Math.floor(ty), direction, target?.netId ?? 0);
+    }
+
+    player.playerAnimation.action = PlayerAction.PLAYER_ATTACK_FIST;
+    player.playerAnimation.lockedUntil =
+      world.gameTime.TotalGameTime.TotalSeconds + ATTACK_ANIMATION_TIME;
+
+    // Depois de usar a habilidade num monstro, continua no ataque normal nele.
+    if (target?.netId !== undefined) world.attackTargetNetId = target.netId;
+    return true;
+  }
+
   return {
     update: dt => {
       cooldown -= dt;
       repathTimer -= dt;
+
+      if (updateSkill(dt)) return;
 
       const player = world.playerEntity;
       const targetId = world.attackTargetNetId;

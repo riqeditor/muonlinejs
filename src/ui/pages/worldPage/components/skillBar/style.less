@@ -1,0 +1,41 @@
+.skill-bar {
+  position: absolute;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  pointer-events: auto;
+
+  button {
+    position: relative;
+    width: 46px;
+    height: 46px;
+    padding: 2px;
+    border: 1px solid #5a4a2a;
+    border-radius: 6px;
+    background: rgba(10, 10, 10, 0.8);
+    color: #e8e8e8;
+    font-size: 10px;
+    line-height: 1.1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+
+    .key {
+      position: absolute;
+      top: 1px;
+      left: 3px;
+      font-size: 9px;
+      color: #aaa;
+    }
+
+    &.selected {
+      border-color: #ffd75e;
+      box-shadow: 0 0 6px #ffd75e;
+      color: #ffd75e;
+    }
+  }
+}

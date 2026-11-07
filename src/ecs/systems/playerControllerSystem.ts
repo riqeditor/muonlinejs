@@ -51,7 +51,49 @@ export const PlayerControllerSystem: ISystemFactory = world => {
     ) {
       pendingClick = true;
     }
+
+    // thegame: botão direito usa a habilidade selecionada na barra (como no MU).
+    if (
+      ev.type === PointerEventTypes.POINTERDOWN &&
+      (ev.event as PointerEvent).button === 2
+    ) {
+      castSelectedSkill();
+    }
   });
+
+  // O menu do navegador no botão direito atrapalha o jogo.
+  scene.getEngine().getRenderingCanvas()?.addEventListener('contextmenu', e => e.preventDefault());
+
+  function castSelectedSkill() {
+    const player = world.playerEntity;
+    if (!player || Store.playerDead) return;
+
+    const skillNumber = Store.selectedSkill;
+    if (skillNumber === null) {
+      Store.addChatMessage('system', 'Selecione uma habilidade na barra (clique ou teclas 1 a 5).');
+      return;
+    }
+
+    const target = world.currentPointerTarget;
+    if (isAttackable(target)) {
+      world.pendingSkill = {
+        number: skillNumber,
+        targetNetId: target!.netId!,
+        x: target!.transform!.pos.x,
+        y: target!.transform!.pos.z,
+      };
+      return;
+    }
+
+    const pickInfo = scene.pick(lastClientX, lastClientY, m => m === world.terrain?.mesh, true);
+    const point = pickInfo?.pickedPoint;
+    world.pendingSkill = {
+      number: skillNumber,
+      targetNetId: null,
+      x: point ? point.x : player.transform.pos.x,
+      y: point ? point.z : player.transform.pos.z,
+    };
+  }
 
   let delay = MOVE_DELAY;
   function tryMove() {

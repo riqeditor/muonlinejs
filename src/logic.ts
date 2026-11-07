@@ -3,6 +3,8 @@ import { CharacterClassNumber, ENUM_WORLD } from './common';
 import { deserializeAppearance } from './common/deserializeAppearance';
 import { decodeUtf8 } from './common/utf8';
 import { experienceForLevel } from './common/experience';
+import { SKILL_DEFINITIONS, SkillKind } from './common/skills/skillDefinitions';
+import { directionTo } from './common/direction';
 import { ItemsDatabase } from './common/itemsDatabase';
 import { ItemSerializer } from './common/itemSerializer';
 import { ModelFactoryPerId } from './common/modelFactoryPerId';
@@ -959,6 +961,93 @@ function onItemMoveResponse(packet: DataView) {
   });
   Store.syncPlayerAppearance();
 }
+// thegame: C1 F3 11 lista de habilidades (SkillListUpdate / SkillAdded / SkillRemoved, mesmo
+// código). Byte 4 = quantidade (lista) ou 0xFE (adiciona uma) ou 0xFF (remove uma);
+// byte 5 = tipo da lista; a partir do byte 6, entradas de 4 bytes [índice, número LE16, nível].
+function onSkillList(packet: DataView) {
+  if (packet.byteLength < 6) return;
+  const flag = packet.getUint8(4);
+  const listType = packet.getUint8(5);
+
+  const readEntry = (offset: number) => ({
+    index: packet.getUint8(offset),
+    number: packet.getUint16(offset + 1, true),
+    level: packet.getUint8(offset + 3),
+  });
+
+  runInAction(() => {
+    if (flag === 0xfe || flag === 0xff) {
+      if (packet.byteLength < 10) return;
+      const entry = readEntry(6);
+      Store.skills = Store.skills.filter(s => s.number !== entry.number);
+      if (flag === 0xfe) {
+        Store.skills.push(entry);
+        Store.skills.sort((a, b) => a.index - b.index);
+      } else if (Store.selectedSkill === entry.number) {
+        Store.selectedSkill = null;
+      }
+      return;
+    }
+
+    const entries = [];
+    for (let i = 0; i < flag && 6 + i * 4 + 4 <= packet.byteLength; i++) {
+      entries.push(readEntry(6 + i * 4));
+    }
+    if (listType === 0) {
+      Store.skills = entries;
+    } else if (listType === 2) {
+      const removed = new Set(entries.map(e => e.number));
+      Store.skills = Store.skills.filter(s => !removed.has(s.number));
+    } else {
+      const added = new Set(entries.map(e => e.number));
+      Store.skills = [...Store.skills.filter(s => !added.has(s.number)), ...entries];
+    }
+
+    const usable = Store.skills.filter(s => isUsableSkill(s.number));
+    if (Store.selectedSkill === null || !usable.some(s => s.number === Store.selectedSkill)) {
+      Store.selectedSkill = usable[0]?.number ?? null;
+    }
+  });
+}
+EventBus.on('SkillAdded', onSkillList);
+EventBus.on('SkillRemoved', onSkillList);
+EventBus.on('SkillListUpdate', onSkillList);
+
+/** Habilidades que o jogador usa (não passivas). */
+export function isUsableSkill(number: number): boolean {
+  const def = SKILL_DEFINITIONS[number];
+  return !!def && def[1] !== SkillKind.PassiveBoost;
+}
+
+// thegame: C3 19 SkillAnimation — alguém usou uma habilidade: anima o lançador.
+EventBus.on('SkillAnimation', packet => {
+  if (packet.byteLength < 9) return;
+  const casterId = packet.getUint16(5, false) & 0x7fff;
+  const targetId = packet.getUint16(7, false) & 0x7fff;
+  const caster = findNetObject(casterId);
+  if (!caster || caster.dead || caster.localPlayer) return;
+
+  const target = findNetObject(targetId);
+  if (target && target !== caster) {
+    const dir = directionTo(
+      caster.transform.pos.x,
+      caster.transform.pos.z,
+      target.transform.pos.x,
+      target.transform.pos.z
+    );
+    caster.transform.rot.y = convertDirectionToAngle(dir);
+  }
+
+  const lockedUntil = gameTimeNow() + ACTION_ANIMATION_TIME;
+  if (caster.playerAnimation) {
+    caster.playerAnimation.action = PlayerAction.PLAYER_ATTACK_FIST;
+    caster.playerAnimation.lockedUntil = lockedUntil;
+  } else if (caster.monsterAnimation) {
+    caster.monsterAnimation.action = MonsterActionType.Attack1;
+    caster.monsterAnimation.lockedUntil = lockedUntil;
+  }
+});
+
 EventBus.on('ItemMoved', onItemMoveResponse);
 EventBus.on('ItemMoveRequestFailed', onItemMoveResponse);
 

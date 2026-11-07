@@ -297,7 +297,9 @@ export type ChatEntry = {
   text: string;
 };
 
-export type DamagePopup = { id: number; netId: number; text: string; color: string };
+let areaSkillAnimationCounter = 0;
+
+export type DamagePopup ={ id: number; netId: number; text: string; color: string };
 const DAMAGE_POPUP_DURATION_MS = 1000;
 let damagePopupCounter = 0;
 
@@ -364,6 +366,11 @@ export const Store = new (class _Store {
   chatOpen = false;
   chatInput = '';
 
+  /** thegame: habilidades do personagem (C1 F3 11), na ordem do servidor. */
+  skills: { index: number; number: number; level: number }[] = [];
+  /** thegame: número da habilidade selecionada na barra (usada com o botão direito). */
+  selectedSkill: number | null = null;
+
   /** thegame: slot do item "na mão" (selecionado para mover) no inventário. */
   heldItemSlot: number | null = null;
   /** thegame: movimento de item aguardando a resposta do servidor (C3 24). */
@@ -417,6 +424,8 @@ export const Store = new (class _Store {
       sendChatMessage: action,
       playerDead: observable,
       heldItemSlot: observable,
+      skills: observable,
+      selectedSkill: observable,
       sendItemMove: action,
       equipItem: action,
       unequipItem: action,
@@ -737,6 +746,32 @@ export const Store = new (class _Store {
       return;
     }
     this.sendItemMove(fromSlot, target);
+  }
+
+  /** C3 19 TargetedSkill: habilidade num alvo (ou em si mesmo, para buffs). */
+  sendTargetedSkill(skillNumber: number, targetId: number): void {
+    const bytes = new Uint8Array([
+      0xc3, 7, 0x19,
+      (skillNumber >> 8) & 0xff, skillNumber & 0xff,
+      (targetId >> 8) & 0xff, targetId & 0xff,
+    ]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C3 1E AreaSkill: habilidade de área no ponto (x, y). */
+  sendAreaSkill(skillNumber: number, x: number, y: number, direction: number, extraTargetId = 0): void {
+    areaSkillAnimationCounter = (areaSkillAnimationCounter + 1) & 0xff;
+    const bytes = new Uint8Array([
+      0xc3, 13, 0x1e,
+      (skillNumber >> 8) & 0xff, skillNumber & 0xff,
+      x & 0xff, y & 0xff,
+      // Rotação em 256 passos (direção do MU 0..7 * 32).
+      (direction * 32) & 0xff,
+      0, 0,
+      (extraTargetId >> 8) & 0xff, extraTargetId & 0xff,
+      areaSkillAnimationCounter,
+    ]);
+    this.sendToGS(new DataView(bytes.buffer));
   }
 
   /** C3 22 PickupItemRequest: pega o item/zen `itemId` do chão. */

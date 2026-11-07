@@ -159,6 +159,8 @@ export class World extends ECSWorld<Entity> {
   currentPointerTarget: Entity | null = null;
   /** thegame: netId do monstro que o jogador local está atacando (null = nenhum). */
   attackTargetNetId: number | null = null;
+  /** thegame: habilidade a usar (botão direito). Alvo = monstro (targetNetId) ou ponto (x, y). */
+  pendingSkill: { number: number; targetNetId: number | null; x: number; y: number } | null = null;
   /** thegame: netId do item no chão que o jogador local vai pegar (null = nenhum). */
   pickupTargetNetId: number | null = null;
 
