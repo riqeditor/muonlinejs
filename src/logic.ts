@@ -5,6 +5,10 @@ import { decodeUtf8 } from './common/utf8';
 import { ItemsDatabase } from './common/itemsDatabase';
 import { ItemSerializer } from './common/itemSerializer';
 import { ModelFactoryPerId } from './common/modelFactoryPerId';
+import {
+  getGenericModelFactory,
+  getMonsterModelName,
+} from './common/monsters/genericMonster';
 import { ModelObject } from './common/modelObject';
 import { MonstersDatabase } from './common/monstersDatabase';
 import {
@@ -239,7 +243,9 @@ EventBus.on('AddNpcsToScope', packet => {
 
   npcs.forEach(npc => {
     const id = npc.Id & 0x7fff;
-    const definedModelFactory = ModelFactoryPerId[npc.TypeNumber];
+    // thegame: classe própria (ModelFactoryPerId) > modelo da tabela do MuMain > modelo padrão.
+    const definedModelFactory =
+      ModelFactoryPerId[npc.TypeNumber] ?? getGenericModelFactory(npc.TypeNumber);
     if (!definedModelFactory) {
       console.warn(
         `No model factory found for NPC type ${npc.TypeNumber}. Using default PlayerObject.`
@@ -290,7 +296,10 @@ EventBus.on('AddNpcsToScope', packet => {
         x: 0,
         y: 0,
       },
-      objectNameInWorld: MonstersDatabase.get(npc.TypeNumber)?.Name || 'NPC',
+      objectNameInWorld:
+        MonstersDatabase.get(npc.TypeNumber)?.Name ||
+        getMonsterModelName(npc.TypeNumber) ||
+        'NPC',
       interactable: true,
     });
 

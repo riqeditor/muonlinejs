@@ -9,7 +9,7 @@ export class Hound extends MonsterObject {
   }
 
   async init(world: World) {
-    const bmd = await loadGLTF('Monster/Monster01.glb', world);
+    const bmd = await loadGLTF('Monster/Monster02.glb', world);
 
     super.load(bmd);
   }
