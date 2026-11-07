@@ -2,6 +2,8 @@ import { CharacterClassNumber } from '../../common';
 import { directionTo, directionToAngle, tileDistance } from '../../common/direction';
 import { MONSTER_MODELS } from '../../common/monsters/monsterModels';
 import { SKILL_DEFINITIONS, SkillKind } from '../../common/skills/skillDefinitions';
+import { playSkillEffect } from '../../effects/skillEffects';
+import { Vector3 } from '../../libs/babylon/exports';
 import { PlayerAction } from '../../common/objects/enum';
 import { Store } from '../../store';
 import type { Entity, ISystemFactory, World } from '../world';
@@ -28,6 +30,13 @@ const ELF_CLASSES = new Set<CharacterClassNumber>([
   CharacterClassNumber.MuseElf,
   CharacterClassNumber.HighElf,
 ]);
+
+/** thegame: posição do corpo do objeto na cena (para efeitos visuais). */
+export function entityScenePosition(entity: Entity): Vector3 {
+  const pos = entity.transform!.pos;
+  const offset = entity.transform!.posOffset;
+  return new Vector3(pos.x + (offset?.x ?? 0.5), pos.y + 1, pos.z + (offset?.z ?? 0.5));
+}
 
 /** Monstros (não NPCs/guardas) vivos podem ser atacados. */
 export function isAttackable(entity: Entity | null | undefined): boolean {
@@ -116,6 +125,14 @@ export const CombatSystem: ISystemFactory = world => {
     player.playerAnimation.action = PlayerAction.PLAYER_ATTACK_FIST;
     player.playerAnimation.lockedUntil =
       world.gameTime.TotalGameTime.TotalSeconds + ATTACK_ANIMATION_TIME;
+
+    // thegame: efeito visual da habilidade.
+    playSkillEffect(
+      world.scene,
+      skill.number,
+      entityScenePosition(player),
+      isSelfCast ? entityScenePosition(player) : target ? entityScenePosition(target) : new Vector3(tx + 0.5, world.getTerrainHeight(tx, ty) + 1, ty + 0.5)
+    );
 
     // Depois de usar a habilidade num monstro, continua no ataque normal nele.
     if (target?.netId !== undefined) world.attackTargetNetId = target.netId;

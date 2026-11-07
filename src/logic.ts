@@ -5,6 +5,8 @@ import { decodeUtf8 } from './common/utf8';
 import { experienceForLevel } from './common/experience';
 import { SKILL_DEFINITIONS, SkillKind } from './common/skills/skillDefinitions';
 import { directionTo } from './common/direction';
+import { playSkillEffect } from './effects/skillEffects';
+import { entityScenePosition } from './ecs/systems/combatSystem';
 import { ItemsDatabase } from './common/itemsDatabase';
 import { ItemSerializer } from './common/itemSerializer';
 import { ModelFactoryPerId } from './common/modelFactoryPerId';
@@ -1054,6 +1056,16 @@ EventBus.on('SkillAnimation', packet => {
   if (!caster || caster.dead || caster.localPlayer) return;
 
   const target = findNetObject(targetId);
+  const scene = Store.world?.scene;
+  if (scene) {
+    const skillNumber = packet.getUint16(3, false);
+    playSkillEffect(
+      scene,
+      skillNumber,
+      entityScenePosition(caster),
+      target ? entityScenePosition(target) : null
+    );
+  }
   if (target && target !== caster) {
     const dir = directionTo(
       caster.transform.pos.x,
