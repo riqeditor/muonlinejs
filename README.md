@@ -1,5 +1,9 @@
 # MU Online JS (TypeScript Client)
 
+> **thegame:** este é um fork do [afrokick/muonlinejs](https://github.com/afrokick/muonlinejs) usado no projeto thegame, um servidor de MU Online jogável no navegador para jogar com amigos.
+> É um **projeto de fã, sem fins lucrativos e sem vínculo com a Webzen**, dona do MU Online.
+> Servidor: [OpenMU](https://github.com/MUnique/OpenMU), rodando localmente com Docker. O cliente conecta pela porta `44405` (protocolo do cliente original), através do proxy (`bun run proxy`, porta `3000`).
+
 [Live Demo](https://mujs.asosnovskiy.com/offline)
 
 A modern TypeScript/Babylon.js client for **MU Online** that works out-of-the-box with the [OpenMU](https://github.com/MUnique/OpenMU) server.
