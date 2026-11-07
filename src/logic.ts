@@ -2,6 +2,7 @@ import { runInAction } from 'mobx';
 import { CharacterClassNumber, ENUM_WORLD } from './common';
 import { deserializeAppearance } from './common/deserializeAppearance';
 import { decodeUtf8 } from './common/utf8';
+import { experienceForLevel } from './common/experience';
 import { ItemsDatabase } from './common/itemsDatabase';
 import { ItemSerializer } from './common/itemSerializer';
 import { ModelFactoryPerId } from './common/modelFactoryPerId';
@@ -32,6 +33,8 @@ import {
   ObjectMovedPacket,
   ObjectAnimationPacket,
   ObjectGotKilledPacket,
+  ExperienceGainedPacket,
+  CharacterLevelUpdatePacket,
   ObjectHitDamageKindEnum,
   ObjectHitPacket,
   ObjectWalkedPacket,
@@ -152,6 +155,13 @@ EventBus.on('CharacterInformation', packet => {
     playerData.exp = Number(p.CurrentExperience);
     playerData.expToNextLvl = Number(p.ExperienceForNextLevel);
     playerData.points = p.LevelUpPoints;
+
+    // thegame: o CharacterInformation da Season 6 não traz o nível; vem da lista de personagens.
+    const selected = Store.charactersList.find(c => c.Name === Store.characterName);
+    if (selected) {
+      playerData.level = selected.Level;
+      playerData.currentLvlExp = experienceForLevel(selected.Level);
+    }
 
     playerData.str = p.Strength;
     playerData.agi = p.Agility;
@@ -690,6 +700,54 @@ EventBus.on('ObjectGotKilled', packet => {
       Store.playerDead = true;
       Store.playerData.currentHP = 0;
     });
+  }
+});
+
+// thegame: C3 16 ExperienceGained. XP ganha ao matar um monstro.
+EventBus.on('ExperienceGained', packet => {
+  const p = new ExperienceGainedPacket(packet);
+  const added = p.AddedExperience;
+  if (added <= 0) return;
+
+  runInAction(() => {
+    Store.playerData.exp += added;
+    const localId = Store.world?.playerEntity?.netId;
+    if (localId !== undefined) {
+      Store.addDamagePopup(localId, `+${added} XP`, '#ffd75e');
+    }
+  });
+});
+
+// thegame: C1 F3 05 CharacterLevelUpdate. Subiu de nível: atualiza nível, pontos e máximos,
+// e calcula a faixa de XP do novo nível (o pacote não traz a XP do próximo nível).
+EventBus.on('CharacterLevelUpdate', packet => {
+  const p = new CharacterLevelUpdatePacket(packet);
+  const playerData = Store.playerData;
+
+  runInAction(() => {
+    playerData.level = p.Level;
+    playerData.points = p.LevelUpPoints;
+    playerData.maxHP = p.MaximumHealth;
+    playerData.maxMP = p.MaximumMana;
+    playerData.maxSD = p.MaximumShield;
+    playerData.maxAG = p.MaximumAbility;
+    playerData.currentLvlExp = experienceForLevel(p.Level);
+    playerData.expToNextLvl = experienceForLevel(p.Level + 1);
+
+    Store.addChatMessage(
+      'system',
+      `Parabéns! Você subiu para o nível ${p.Level}. Pontos para distribuir: ${p.LevelUpPoints}.`
+    );
+    const localId = Store.world?.playerEntity?.netId;
+    if (localId !== undefined) {
+      Store.addDamagePopup(localId, `NÍVEL ${p.Level}!`, '#ffe14d');
+    }
+  });
+
+  const player = Store.world?.playerEntity;
+  if (player) {
+    player.attributeSystem.setValue('maxHealth', p.MaximumHealth);
+    player.attributeSystem.setValue('maxMana', p.MaximumMana);
   }
 });
 
