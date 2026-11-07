@@ -248,6 +248,8 @@ EventBus.on('AddNpcsToScope', packet => {
 
     const modelFactory = definedModelFactory || PlayerObject;
 
+    removeExistingNetObject(world, id);
+
     const npcEntity = world.add({
       netId: id,
       worldIndex,
@@ -297,6 +299,32 @@ EventBus.on('AddNpcsToScope', packet => {
   });
 });
 
+/**
+ * thegame: se o servidor manda de novo um objeto que já está na tela (ele saiu e voltou
+ * para o alcance, ou o pacote foi repetido), remove a cópia antiga para não duplicar.
+ * O jogador local nunca é removido aqui.
+ */
+function removeExistingNetObject(world: World, netId: number) {
+  for (const e of [...world.netObjsQuery.entities]) {
+    if (e.netId === netId && !e.objOutOfScope && !e.localPlayer) {
+      world.addComponent(e, 'objOutOfScope', true);
+    }
+  }
+}
+
+// thegame: os objetos que chegam enquanto o mapa ainda carrega recebem a altura do chão
+// do mapa anterior (ex.: a tela de login) e ficavam embaixo do chão, invisíveis. Quando
+// o mapa termina de carregar, recalcula a altura de todos os objetos desse mapa.
+EventBus.on('warpCompleted', ({ map }) => {
+  const world = Store.world;
+  if (!world || !world.terrain) return;
+
+  for (const e of world.netObjsQuery.entities) {
+    if (e.worldIndex !== undefined && e.worldIndex !== map) continue;
+    e.transform.pos.y = world.getTerrainHeight(e.transform.pos.x, e.transform.pos.z);
+  }
+});
+
 EventBus.on('AddCharactersToScope', packet => {
   const p = new AddCharactersToScopePacket(packet);
   const chars = p.getCharacters();
@@ -309,6 +337,21 @@ EventBus.on('AddCharactersToScope', packet => {
 
   chars.forEach(char => {
     const maskedId = char.Id & 0x7fff;
+
+    // O próprio jogador já existe (ex.: o servidor o reenviou): só atualiza a posição.
+    const localPlayer = world.playerEntity;
+    if (localPlayer && localPlayer.netId === maskedId) {
+      localPlayer.transform.pos.x = char.CurrentPositionX;
+      localPlayer.transform.pos.z = char.CurrentPositionY;
+      localPlayer.transform.pos.y = world.getTerrainHeight(
+        char.CurrentPositionX,
+        char.CurrentPositionY
+      );
+      return;
+    }
+
+    removeExistingNetObject(world, maskedId);
+
     const appearance = deserializeAppearance(char.Appearance);
     const playerEntity = spawnPlayer(world, { cls: appearance.cls });
     world.addComponent(playerEntity, 'netId', maskedId);
