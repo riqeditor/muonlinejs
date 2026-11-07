@@ -1048,6 +1048,21 @@ EventBus.on('SkillAnimation', packet => {
   }
 });
 
+// thegame: C1 23 ItemDropResponse — resposta ao jogar um item no chão.
+EventBus.on('ItemDropResponse', packet => {
+  const success = packet.byteLength > 3 && packet.getUint8(3) !== 0;
+  const slot = packet.byteLength > 4 ? packet.getUint8(4) : Store.pendingItemDrop;
+  Store.pendingItemDrop = null;
+  runInAction(() => {
+    if (success && slot !== null && slot !== undefined) {
+      Store.playerData.items[slot] = null as unknown as Item;
+    } else if (!success) {
+      Store.addChatMessage('system', 'Não foi possível jogar o item no chão aqui.');
+    }
+  });
+  Store.syncPlayerAppearance();
+});
+
 EventBus.on('ItemMoved', onItemMoveResponse);
 EventBus.on('ItemMoveRequestFailed', onItemMoveResponse);
 

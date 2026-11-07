@@ -5,10 +5,13 @@ import {
 } from '../../libs/babylon/exports';
 import type { ISystemFactory } from '../world';
 import { Store } from '../../store';
+import { runInAction } from 'mobx';
 import { isAttackable } from './combatSystem';
 import { CLICK_PICKUP_RADIUS, findGroundItemNear } from './pickupSystem';
 
 const MOVE_DELAY = 0.25;
+/** thegame: até quantos quadrados do personagem dá para jogar um item no chão. */
+const DROP_RANGE = 3;
 
 export const PlayerControllerSystem: ISystemFactory = world => {
   const query = world.with('playerMoveTo', 'transform', 'pathfinding');
@@ -61,8 +64,49 @@ export const PlayerControllerSystem: ISystemFactory = world => {
     }
   });
 
+  // thegame: soltar o arraste de um item do inventário em cima do mapa = jogar no chão.
+  // O Babylon ignora o "soltar" quando o "apertar" começou fora do canvas (no painel),
+  // por isso a escuta é na janela, conferindo se o cursor está sobre o canvas.
+  const canvas = scene.getEngine().getRenderingCanvas();
+  window.addEventListener('pointerup', ev => {
+    if (ev.button !== 0 || Store.heldItemSlot === null || !Store.heldItemDragging) return;
+    const under = document.elementFromPoint(ev.clientX, ev.clientY);
+    if (under !== canvas) return;
+    lastClientX = ev.clientX;
+    lastClientY = ev.clientY;
+    pendingClick = false;
+    dropHeldItemOnGround();
+  });
+
   // O menu do navegador no botão direito atrapalha o jogo.
   scene.getEngine().getRenderingCanvas()?.addEventListener('contextmenu', e => e.preventDefault());
+
+  /** Joga o item "na mão" no chão onde está o cursor (ou ao lado do personagem, se longe). */
+  function dropHeldItemOnGround() {
+    const player = world.playerEntity;
+    const slot = Store.heldItemSlot;
+    runInAction(() => {
+      Store.heldItemSlot = null;
+      Store.heldItemDragging = false;
+    });
+    if (!player || slot === null) return;
+
+    const px = Math.floor(player.transform.pos.x);
+    const py = Math.floor(player.transform.pos.z);
+    let x = px;
+    let y = py;
+    const pickInfo = scene.pick(lastClientX, lastClientY, m => m === world.terrain?.mesh, true);
+    const point = pickInfo?.pickedPoint;
+    if (point) {
+      const tx = Math.floor(point.x);
+      const ty = Math.floor(point.z);
+      if (Math.max(Math.abs(tx - px), Math.abs(ty - py)) <= DROP_RANGE && world.isWalkable(tx, ty)) {
+        x = tx;
+        y = ty;
+      }
+    }
+    Store.sendDropItem(slot, x, y);
+  }
 
   function castSelectedSkill() {
     const player = world.playerEntity;
@@ -102,6 +146,12 @@ export const PlayerControllerSystem: ISystemFactory = world => {
 
     // thegame: morto não anda (espera o RespawnAfterDeath).
     if (Store.playerDead) return;
+
+    // thegame: com um item do inventário "na mão", clicar no mapa joga o item no chão.
+    if (Store.heldItemSlot !== null) {
+      dropHeldItemOnGround();
+      return;
+    }
 
     // thegame: clique num monstro = atacar (CombatSystem). Clique no chão cancela o ataque.
     const target = world.currentPointerTarget;

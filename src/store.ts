@@ -373,6 +373,10 @@ export const Store = new (class _Store {
 
   /** thegame: slot do item "na mão" (selecionado para mover) no inventário. */
   heldItemSlot: number | null = null;
+  /** thegame: o item "na mão" está sendo arrastado (botão do mouse ainda pressionado). */
+  heldItemDragging = false;
+  /** thegame: slot do item jogado no chão aguardando a resposta (C1 23). */
+  pendingItemDrop: number | null = null;
   /** thegame: movimento de item aguardando a resposta do servidor (C3 24). */
   pendingItemMove: { fromSlot: number; toSlot: number } | null = null;
 
@@ -771,6 +775,14 @@ export const Store = new (class _Store {
       (extraTargetId >> 8) & 0xff, extraTargetId & 0xff,
       areaSkillAnimationCounter,
     ]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C3 23 DropItemRequest: joga o item do slot `slot` no chão em (x, y). */
+  sendDropItem(slot: number, x: number, y: number): void {
+    if (!this.playerData.items[slot]) return;
+    this.pendingItemDrop = slot;
+    const bytes = new Uint8Array([0xc3, 6, 0x23, x & 0xff, y & 0xff, slot]);
     this.sendToGS(new DataView(bytes.buffer));
   }
 

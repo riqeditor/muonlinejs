@@ -1,7 +1,7 @@
 import './style.less';
 import { observer } from 'mobx-react-lite';
 import { runInAction } from 'mobx';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Store } from '../../../../../store';
 import { ItemIcon } from '../../../../components/itemIcon';
 import { useEventBus } from '../../../../../hooks/useEventBus';
@@ -23,17 +23,15 @@ import {
 
 const isEquipmentSlot = (slot: number) => slot < FIRST_BAG_SLOT;
 
-function onSlotClick(slot: number) {
+/** Coloca o item "na mão" no slot `slot` (equipamento ou mochila). */
+function placeHeldItem(slot: number) {
   const items = Store.playerData.items;
   const held = Store.heldItemSlot;
-
-  if (held === null) {
-    if (items[slot]) runInAction(() => (Store.heldItemSlot = slot));
-    return;
-  }
-
-  runInAction(() => (Store.heldItemSlot = null));
-  if (held === slot) return;
+  runInAction(() => {
+    Store.heldItemSlot = null;
+    Store.heldItemDragging = false;
+  });
+  if (held === null || held === slot) return;
 
   const item = items[held];
   if (!item) return;
@@ -45,23 +43,72 @@ function onSlotClick(slot: number) {
   Store.sendItemMove(held, slot);
 }
 
+// Botão pressionado: pega o item (começa a arrastar) ou, se já tem um item na mão, solta aqui.
+function onSlotPointerDown(slot: number, e: React.PointerEvent) {
+  if (e.button !== 0) return;
+  e.stopPropagation();
+  if (Store.heldItemSlot === null) {
+    if (Store.playerData.items[slot]) {
+      runInAction(() => {
+        Store.heldItemSlot = slot;
+        Store.heldItemDragging = true;
+      });
+    }
+    return;
+  }
+  if (!Store.heldItemDragging) placeHeldItem(slot);
+}
+
+// Botão solto: se estava arrastando para outro slot, solta lá; no mesmo slot, o item fica "na mão".
+function onSlotPointerUp(slot: number, e: React.PointerEvent) {
+  if (e.button !== 0) return;
+  e.stopPropagation();
+  if (!Store.heldItemDragging || Store.heldItemSlot === null) return;
+  if (slot === Store.heldItemSlot) {
+    runInAction(() => (Store.heldItemDragging = false));
+    return;
+  }
+  placeHeldItem(slot);
+}
+
 function onSlotRightClick(slot: number) {
-  runInAction(() => (Store.heldItemSlot = null));
+  runInAction(() => {
+    Store.heldItemSlot = null;
+    Store.heldItemDragging = false;
+  });
   if (!Store.playerData.items[slot]) return;
   if (isEquipmentSlot(slot)) Store.unequipItem(slot);
   else Store.equipItem(slot);
 }
 
 const slotHandlers = (slot: number) => ({
-  onClick: (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSlotClick(slot);
-  },
+  onPointerDown: (e: React.PointerEvent) => onSlotPointerDown(slot, e),
+  onPointerUp: (e: React.PointerEvent) => onSlotPointerUp(slot, e),
   onContextMenu: (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     onSlotRightClick(slot);
   },
+});
+
+/** Ícone do item "na mão" seguindo o cursor, como no MU. */
+const HeldItemCursor = observer(() => {
+  const [pos, setPos] = useState({ x: -1000, y: -1000 });
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => setPos({ x: e.clientX, y: e.clientY });
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, []);
+
+  const slot = Store.heldItemSlot;
+  const item = slot !== null ? Store.playerData.items[slot] : null;
+  if (!item) return null;
+
+  return (
+    <div className="held-item-cursor" style={{ left: pos.x, top: pos.y }}>
+      <ItemIcon {...item} />
+    </div>
+  );
 });
 
 const ItemTooltip = ({ item, children }: { item: Item | null; children: React.ReactNode }) => {
@@ -163,7 +210,10 @@ export const Inventory = observer(() => {
       });
     }
     if (key === 'Escape') {
-      runInAction(() => (Store.heldItemSlot = null));
+      runInAction(() => {
+        Store.heldItemSlot = null;
+        Store.heldItemDragging = false;
+      });
     }
   });
 
@@ -190,7 +240,10 @@ export const Inventory = observer(() => {
       </div>
       <BagGrid />
       <div className="zen">Zen: {playerData.money.toLocaleString('pt-BR')}</div>
-      <div className="inventory-hint">Clique: pegar/soltar · Botão direito: equipar · Esc: cancelar</div>
+      <div className="inventory-hint">
+        Arraste ou clique para mover · solte no chão para jogar fora · botão direito: equipar · Esc: cancelar
+      </div>
+      <HeldItemCursor />
     </div>
   );
 });
