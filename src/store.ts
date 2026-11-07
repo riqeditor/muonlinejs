@@ -380,6 +380,9 @@ export const Store = new (class _Store {
   /** thegame: movimento de item aguardando a resposta do servidor (C3 24). */
   pendingItemMove: { fromSlot: number; toSlot: number } | null = null;
 
+  /** thegame: tela "Carregando mapa…" enquanto o mapa e as texturas carregam. */
+  mapLoading = false;
+
   /** thegame: o jogador local morreu e espera o RespawnAfterDeath. */
   playerDead = false;
   /** thegame: números de dano flutuando sobre os personagens/monstros. */
@@ -427,6 +430,7 @@ export const Store = new (class _Store {
       addChatMessage: action,
       sendChatMessage: action,
       playerDead: observable,
+      mapLoading: observable,
       heldItemSlot: observable,
       skills: observable,
       selectedSkill: observable,

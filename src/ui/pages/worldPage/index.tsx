@@ -7,6 +7,7 @@ import { CharacterInfo } from './components/characterInfo';
 import { Inventory } from './components/inventory';
 import { ChatBox } from './components/chatBox';
 import { SkillBar } from './components/skillBar';
+import { MapLoadingOverlay } from './components/mapLoading';
 import { CombatOverlay } from './components/combatOverlay';
 
 const HUD = observer(() => {
@@ -30,6 +31,7 @@ export const WorldPage = observer(() => {
       <WorldObjects />
       <CombatOverlay />
       <HUD />
+      <MapLoadingOverlay />
     </div>
   );
 });

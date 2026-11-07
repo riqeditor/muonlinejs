@@ -479,6 +479,32 @@ EventBus.on('MapChanged', packet => {
   Store.sendClientReadyAfterMapChange();
 });
 
+// thegame: tela de carregamento. Liga ao pedir a troca de mapa e desliga quando o mapa
+// terminou e a cena está pronta para desenhar (texturas e materiais), evitando os
+// objetos brancos aparecendo enquanto as texturas carregam. Limite de 15 s.
+const MAP_LOADING_TIMEOUT_MS = 15000;
+let mapLoadingToken = 0;
+EventBus.on('requestWarp', () => {
+  mapLoadingToken++;
+  runInAction(() => (Store.mapLoading = true));
+});
+EventBus.on('warpCompleted', () => {
+  const token = mapLoadingToken;
+  const started = performance.now();
+  let readyChecks = 0;
+  const check = () => {
+    if (token !== mapLoadingToken) return; // outra troca de mapa começou
+    const scene = Store.world?.scene;
+    readyChecks = scene?.isReady(true) ? readyChecks + 1 : 0;
+    if (readyChecks >= 2 || performance.now() - started > MAP_LOADING_TIMEOUT_MS) {
+      runInAction(() => (Store.mapLoading = false));
+      return;
+    }
+    setTimeout(check, 200);
+  };
+  setTimeout(check, 200);
+});
+
 let pendingReadyAfterMapChange: ENUM_WORLD | null = null;
 EventBus.on('warpCompleted', ({ map }) => {
   if (pendingReadyAfterMapChange !== map) return;

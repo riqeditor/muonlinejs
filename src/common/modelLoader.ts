@@ -91,6 +91,28 @@ function getTexture(key: string, fallback: Texture) {
   return fallback;
 }
 
+/** Tempo máximo esperando texturas (ms): se uma textura falhar, o modelo aparece mesmo assim. */
+const TEXTURE_WAIT_TIMEOUT_MS = 8000;
+
+/** thegame: espera todas as texturas ficarem prontas (ou o tempo máximo). */
+function waitTexturesReady(textures: Texture[]): Promise<void> {
+  const unique = [...new Set(textures)];
+  const pending = unique.filter(t => !t.isReady());
+  if (pending.length === 0) return Promise.resolve();
+
+  const all = Promise.all(
+    pending.map(
+      t =>
+        new Promise<void>(res => {
+          if (t.isReady()) return res();
+          t.onLoadObservable.addOnce(() => res());
+        })
+    )
+  ).then(() => undefined);
+  const timeout = new Promise<void>(res => setTimeout(res, TEXTURE_WAIT_TIMEOUT_MS));
+  return Promise.race([all, timeout]);
+}
+
 export async function loadGLTF(filePath: string, world: World) {
   filePath = resolveUrlToDataFolder(filePath);
   const fileName = filePath.split('/').at(-1)!;
@@ -198,10 +220,20 @@ export async function loadGLTF(filePath: string, world: World) {
             s.prepare();
           }
 
-          resolve({
-            mesh: task.loadedMeshes[0]!,
-            skeleton,
-            animationGroups: task.loadedAnimationGroups,
+          // thegame: o modelo só aparece quando as texturas dele terminam de carregar.
+          // Antes ele surgia na hora com a "textura vazia" (branca) e depois trocava.
+          const textures = task.loadedMeshes
+            .map(mesh => mesh.metadata?.diffuseTexture as Texture | undefined)
+            .filter((t): t is Texture => !!t);
+          task.loadedMeshes.forEach(mesh => mesh.setEnabled(false));
+
+          waitTexturesReady(textures).then(() => {
+            task.loadedMeshes.forEach(mesh => mesh.setEnabled(true));
+            resolve({
+              mesh: task.loadedMeshes[0]!,
+              skeleton,
+              animationGroups: task.loadedAnimationGroups,
+            });
           });
         },
         () => {
