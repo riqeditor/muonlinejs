@@ -82,12 +82,14 @@ export const CalculateScreenPositionSystem: ISystemFactory = world => {
 
         screenPosition.setAll(0);
 
+        // thegame: na cena a altura é o eixo Y (x = X do mapa, z = Y do mapa). O código
+        // antigo somava a altura do rótulo em Z e invertia Y (256 - y), e os rótulos
+        // (nomes, números de dano) caíam fora da tela.
         const position = entity.transform.pos;
-        finalPosition.x = position.x;
-        finalPosition.y = position.y;
-        finalPosition.z = position.z;
-
-        finalPosition.z += entity.screenPosition.worldOffsetZ;
+        const offset = entity.transform.posOffset;
+        finalPosition.x = position.x + (offset?.x ?? 0);
+        finalPosition.y = position.y + entity.screenPosition.worldOffsetZ;
+        finalPosition.z = position.z + (offset?.z ?? 0);
 
         tmp2.copyFrom(finalPosition);
 
@@ -100,7 +102,6 @@ export const CalculateScreenPositionSystem: ISystemFactory = world => {
         // }
 
         if (distSquared < distToCompare) {
-          finalPosition.y = 256 - finalPosition.y;
           Vector3.ProjectToRef(
             finalPosition,
             ZERO_MATRIX,

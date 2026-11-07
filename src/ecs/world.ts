@@ -57,9 +57,15 @@ export type Entity = Partial<{
   };
   playerAnimation: {
     action: PlayerAction;
+    /** thegame: até este instante (gameTime em s) a animação atual não é recalculada (ex.: ataque). */
+    lockedUntil?: number;
   };
+  /** thegame: objeto morto (ObjectGotKilled); não pode ser atacado e mantém a animação de morte. */
+  dead: true;
   monsterAnimation: {
     action: MonsterActionType;
+    /** thegame: até este instante (gameTime em s) ataque/golpe não volta para parado. */
+    lockedUntil?: number;
   };
   attributeSystem: MUAttributeSystem;
   visibility: {
@@ -149,6 +155,8 @@ export class World extends ECSWorld<Entity> {
   readonly assetsManager: AssetsManager;
 
   currentPointerTarget: Entity | null = null;
+  /** thegame: netId do monstro que o jogador local está atacando (null = nenhum). */
+  attackTargetNetId: number | null = null;
 
   pointerPressed = false;
 

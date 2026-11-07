@@ -127,12 +127,18 @@ export const AnimationSystem: ISystemFactory = world => {
         movement,
         attributeSystem,
       } of playersQuery) {
+        // thegame: a morte fica até o renascer; outras animações "travadas" (ataque, golpe)
+        // duram só até lockedUntil. Antes o ataque ficava preso para sempre.
+        if (playerAnimation.action === PlayerAction.PLAYER_DIE1) {
+          continue;
+        }
         if (
-          playerAnimation.action === PlayerAction.PLAYER_ATTACK_FIST ||
-          playerAnimation.action === PlayerAction.PLAYER_DIE1
+          playerAnimation.lockedUntil !== undefined &&
+          world.gameTime.TotalGameTime.TotalSeconds < playerAnimation.lockedUntil
         ) {
           continue;
         }
+        playerAnimation.lockedUntil = undefined;
         playerAnimation.action = calculateAnimation(
           attributeSystem,
           movement.velocity
@@ -169,19 +175,28 @@ export const AnimationSystem: ISystemFactory = world => {
       // Monsters
       //
 
-      for (const {
-        monsterAnimation,
-        movement,
-        modelObject,
-      } of monsterAnimatableQuery) {
+      const now = world.gameTime.TotalGameTime.TotalSeconds;
+
+      for (const entity of monsterAnimatableQuery) {
+        const { monsterAnimation, movement, modelObject } = entity;
+
+        // thegame: morto toca a morte uma vez e fica parado no último quadro.
+        if (entity.dead || monsterAnimation.action === MonsterActionType.Die) {
+          modelObject.playAction(MonsterActionType.Die, false);
+          continue;
+        }
+
         const isMoving = movement.velocity.x !== 0 || movement.velocity.y !== 0;
+        const locked =
+          monsterAnimation.lockedUntil !== undefined && now < monsterAnimation.lockedUntil;
 
         if (isMoving) {
           monsterAnimation.action = MonsterActionType.Walk;
+        } else if (!locked) {
+          // Parou de andar, ou o ataque/golpe terminou: volta para parado.
+          monsterAnimation.lockedUntil = undefined;
+          monsterAnimation.action = MonsterActionType.Stop1;
         }
-        // monsterAnimation.action = isMoving
-        //   ? MonsterActionType.Walk
-        //   : MonsterActionType.Stop1;
 
         modelObject.playAction(monsterAnimation.action, true);
       }

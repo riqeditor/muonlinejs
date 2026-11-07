@@ -32,6 +32,8 @@ import {
   ObjectMovedPacket,
   ObjectAnimationPacket,
   ObjectGotKilledPacket,
+  ObjectHitDamageKindEnum,
+  ObjectHitPacket,
   ObjectWalkedPacket,
   ServerMessagePacket,
 } from './common/packets/ServerToClientPackets';
@@ -585,35 +587,163 @@ EventBus.on('ObjectAnimation', packet => {
     packet
   );
 
+  if (obj.dead) return;
+
+  // thegame: ataques/gestos duram um tempo e depois voltam ao normal (antes ficavam presos).
+  const lockedUntil = gameTimeNow() + ACTION_ANIMATION_TIME;
   if (obj.monsterAnimation) {
     obj.monsterAnimation.action = clientActionToPlay as any;
+    obj.monsterAnimation.lockedUntil = lockedUntil;
   } else if (obj.playerAnimation) {
     const action = ServerToClientActionMap[clientActionToPlay];
     if (action !== undefined) {
       obj.playerAnimation.action = action;
+      obj.playerAnimation.lockedUntil = lockedUntil;
     }
   }
 
   obj.transform.rot.y = convertDirectionToAngle(p.Direction);
 });
 
+/** Duração (s) de animações de ataque/golpe vindas do servidor. */
+const ACTION_ANIMATION_TIME = 0.6;
+const SHOCK_ANIMATION_TIME = 0.35;
+
+function gameTimeNow(): number {
+  return Store.world?.gameTime.TotalGameTime.TotalSeconds ?? 0;
+}
+
+function findNetObject(netId: number) {
+  return Store.world?.netObjsQuery.entities.find(e => e.netId === netId && !e.objOutOfScope);
+}
+
+const DAMAGE_COLORS: Record<number, string> = {
+  [ObjectHitDamageKindEnum.NormalRed]: '#ff4a3d',
+  [ObjectHitDamageKindEnum.IgnoreDefenseCyan]: '#3de8ff',
+  [ObjectHitDamageKindEnum.ExcellentLightGreen]: '#7dff6b',
+  [ObjectHitDamageKindEnum.CriticalBlue]: '#4d8dff',
+  [ObjectHitDamageKindEnum.LightPink]: '#ff9ad5',
+  [ObjectHitDamageKindEnum.PoisonDarkGreen]: '#2fa84f',
+  [ObjectHitDamageKindEnum.ReflectedDarkPink]: '#d1458f',
+  [ObjectHitDamageKindEnum.White]: '#ffffff',
+};
+
+// thegame: C1 11 ObjectHit. Alguém (o jogador local, outro jogador ou um monstro) levou dano:
+// mostra o número sobre ele e toca a animação de golpe. A vida do jogador local é
+// atualizada pelo C1 26 FF (CurrentHealthAndShield).
+EventBus.on('ObjectHit', packet => {
+  const p = new ObjectHitPacket(packet);
+  const id = p.ObjectId & 0x7fff;
+  const total = p.HealthDamage + p.ShieldDamage;
+
+  const multiplier = p.IsTripleDamage ? ' x3' : p.IsDoubleDamage ? ' x2' : '';
+  const text = total > 0 ? `${total}${multiplier}` : 'MISS';
+  const color = total > 0 ? DAMAGE_COLORS[p.Kind] ?? '#ff4a3d' : '#d0d0d0';
+  runInAction(() => Store.addDamagePopup(id, text, color));
+
+  const obj = findNetObject(id);
+  if (!obj || obj.dead || total <= 0) return;
+
+  const lockedUntil = gameTimeNow() + SHOCK_ANIMATION_TIME;
+  if (obj.monsterAnimation) {
+    obj.monsterAnimation.action = MonsterActionType.Shock;
+    obj.monsterAnimation.lockedUntil = lockedUntil;
+  } else if (obj.playerAnimation && obj.playerAnimation.lockedUntil === undefined) {
+    obj.playerAnimation.action = PlayerAction.PLAYER_SHOCK;
+    obj.playerAnimation.lockedUntil = lockedUntil;
+  }
+});
+
 EventBus.on('ObjectGotKilled', packet => {
   const p = new ObjectGotKilledPacket(packet);
+  const world = Store.world;
+  if (!world) return;
 
   const killedId = p.KilledId & 0x7fff;
-  const obj = Store.world?.netObjsQuery.entities.find(
-    e => e.netId === killedId
-  );
-
+  const obj = findNetObject(killedId);
   if (!obj) return;
 
-  if (obj.localPlayer) {
-  } else if (obj.monsterAnimation) {
+  world.addComponent(obj, 'dead', true);
+  if (world.attackTargetNetId === killedId) {
+    world.attackTargetNetId = null;
+  }
+
+  // Para de andar.
+  if (obj.pathfinding) {
+    obj.pathfinding.path = [];
+    obj.pathfinding.calculated = true;
+  }
+  if (obj.playerMoveTo) {
+    obj.playerMoveTo.handled = true;
+    obj.playerMoveTo.sendToServer = false;
+  }
+
+  if (obj.monsterAnimation) {
     obj.monsterAnimation.action = MonsterActionType.Die;
   } else if (obj.playerAnimation) {
     obj.playerAnimation.action = PlayerAction.PLAYER_DIE1;
   }
+
+  if (obj.localPlayer) {
+    world.attackTargetNetId = null;
+    runInAction(() => {
+      Store.playerDead = true;
+      Store.playerData.currentHP = 0;
+    });
+  }
 });
+
+// thegame: C1 F3 04 RespawnAfterDeath (Season 6). O cliente só tem as definições das
+// versões 0.75/0.95 (mesmo código), então o pacote chega com esses nomes; aqui os
+// bytes são lidos no formato Season 6 (OpenMU/docs/Packets/C1-F3-04-RespawnAfterDeath_by-server.md).
+function onRespawnAfterDeath(packet: DataView) {
+  const world = Store.world;
+  const player = world?.playerEntity;
+  if (!world || !player || packet.byteLength < 28) return;
+
+  const x = packet.getUint8(4);
+  const y = packet.getUint8(5);
+  const map = packet.getUint8(6) as ENUM_WORLD;
+  const direction = packet.getUint8(7);
+  const health = packet.getUint16(8, true);
+  const mana = packet.getUint16(10, true);
+  const shield = packet.getUint16(12, true);
+  const ability = packet.getUint16(14, true);
+  const money = packet.getUint32(24, true);
+
+  console.log(`Renascendo no mapa ${map} em ${x}, ${y}`);
+
+  world.removeComponent(player, 'dead');
+  player.playerAnimation.action = PlayerAction.PLAYER_STOP_MALE;
+  player.playerAnimation.lockedUntil = undefined;
+  player.pathfinding.path = [];
+  player.pathfinding.calculated = true;
+  player.playerMoveTo.handled = true;
+  player.playerMoveTo.sendToServer = false;
+  player.transform.rot.y = convertDirectionToAngle(direction);
+  player.attributeSystem.setValue('currentHealth', health);
+  player.attributeSystem.setValue('currentMana', mana);
+
+  runInAction(() => {
+    Store.playerDead = false;
+    Store.playerData.currentHP = health;
+    Store.playerData.currentMP = mana;
+    Store.playerData.currentSD = shield;
+    Store.playerData.currentAG = ability;
+    Store.playerData.money = money;
+  });
+
+  if (map !== world.mapIndex) {
+    EventBus.emit('requestWarp', { map, pos: { x, y } });
+    return;
+  }
+
+  player.transform.pos.x = x;
+  player.transform.pos.z = y;
+  player.transform.pos.y = world.getTerrainHeight(x, y);
+}
+EventBus.on('RespawnAfterDeath075', onRespawnAfterDeath);
+EventBus.on('RespawnAfterDeath095', onRespawnAfterDeath);
 
 EventBus.on('ItemsDropped', packet => {
   const world = Store.world;

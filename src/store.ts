@@ -8,6 +8,7 @@ import {
 import {
   ClientReadyAfterMapChangePacket,
   CreateCharacterPacket,
+  HitRequestPacket,
   FocusCharacterPacket,
   LoginShortPasswordPacket,
   RequestCharacterListPacket,
@@ -46,7 +47,7 @@ import { Item, World } from './ecs/world';
 import { EventBus } from './libs/eventBus';
 import { Scalar } from './libs/babylon/exports';
 import { InventoryConstants } from './common/inventoryConstants';
-import { ItemGroups } from './common/objects/enum';
+import { ItemGroups, ServerPlayerActionType } from './common/objects/enum';
 import { ItemsDatabase } from './common/itemsDatabase';
 import { spawnPlayer } from './logic';
 
@@ -294,6 +295,10 @@ export type ChatEntry = {
   text: string;
 };
 
+export type DamagePopup = { id: number; netId: number; text: string; color: string };
+const DAMAGE_POPUP_DURATION_MS = 1000;
+let damagePopupCounter = 0;
+
 const MAX_CHAT_MESSAGES = 50;
 /** Limite de bytes da mensagem: o pacote C1 tem tamanho de 1 byte (até 255 no total). */
 const MAX_CHAT_MESSAGE_BYTES = 100;
@@ -357,6 +362,11 @@ export const Store = new (class _Store {
   chatOpen = false;
   chatInput = '';
 
+  /** thegame: o jogador local morreu e espera o RespawnAfterDeath. */
+  playerDead = false;
+  /** thegame: números de dano flutuando sobre os personagens/monstros. */
+  damagePopups: DamagePopup[] = [];
+
   playerData = new PlayerData();
 
   characterInfoEnabled = false;
@@ -398,6 +408,9 @@ export const Store = new (class _Store {
       chatInput: observable,
       addChatMessage: action,
       sendChatMessage: action,
+      playerDead: observable,
+      damagePopups: observable,
+      addDamagePopup: action,
       playerData: observable,
       notifications: observable,
       world: observable,
@@ -656,6 +669,27 @@ export const Store = new (class _Store {
    * C1 F3 12: avisa o servidor que o mapa terminou de carregar depois de um MapChanged.
    * Só então o OpenMU coloca o jogador de volta no mapa e envia monstros/NPCs/jogadores.
    */
+  /** C1 11 HitRequest: ataque básico (sem habilidade) no objeto `targetId`. */
+  sendHitRequest(targetId: number, direction: number): void {
+    const packet = HitRequestPacket.createPacket();
+    packet.TargetId = targetId;
+    packet.AttackAnimation = ServerPlayerActionType.Attack1;
+    packet.LookingDirection = direction;
+    this.sendToGS(packet.buffer);
+  }
+
+  addDamagePopup(netId: number, text: string, color: string): void {
+    const popup: DamagePopup = { id: ++damagePopupCounter, netId, text, color };
+    this.damagePopups.push(popup);
+    setTimeout(
+      action(() => {
+        const index = this.damagePopups.findIndex(p => p.id === popup.id);
+        if (index >= 0) this.damagePopups.splice(index, 1);
+      }),
+      DAMAGE_POPUP_DURATION_MS
+    );
+  }
+
   sendClientReadyAfterMapChange(): void {
     this.sendToGS(ClientReadyAfterMapChangePacket.createPacket().buffer);
   }

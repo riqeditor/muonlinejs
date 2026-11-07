@@ -4,6 +4,8 @@ import {
   StandardMaterial,
 } from '../../libs/babylon/exports';
 import type { ISystemFactory } from '../world';
+import { Store } from '../../store';
+import { isAttackable } from './combatSystem';
 
 const MOVE_DELAY = 0.25;
 
@@ -54,6 +56,17 @@ export const PlayerControllerSystem: ISystemFactory = world => {
   function tryMove() {
     const playerEntity = world.playerEntity;
     if (!playerEntity) return;
+
+    // thegame: morto não anda (espera o RespawnAfterDeath).
+    if (Store.playerDead) return;
+
+    // thegame: clique num monstro = atacar (CombatSystem). Clique no chão cancela o ataque.
+    const target = world.currentPointerTarget;
+    if (isAttackable(target)) {
+      world.attackTargetNetId = target!.netId!;
+      return;
+    }
+    world.attackTargetNetId = null;
 
     const pickInfo = scene.pick(
       lastClientX,

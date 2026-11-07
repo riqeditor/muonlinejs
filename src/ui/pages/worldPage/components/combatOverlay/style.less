@@ -1,0 +1,69 @@
+.damage-popups {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.damage-popup {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+
+  span {
+    display: block;
+    transform: translateX(-50%);
+    font-size: 20px;
+    font-weight: 800;
+    text-shadow:
+      0 0 3px #000,
+      1px 1px 2px #000;
+    animation: damage-float 1s ease-out forwards;
+    white-space: nowrap;
+  }
+}
+
+@keyframes damage-float {
+  0% {
+    transform: translate(-50%, 0) scale(1.25);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -40px) scale(1);
+    opacity: 0;
+  }
+}
+
+.death-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(60, 0, 0, 0.35);
+  pointer-events: none;
+
+  .death-box {
+    padding: 1rem 2rem;
+    border: 1px solid #7a2a2a;
+    border-radius: 8px;
+    background: rgba(10, 10, 10, 0.85);
+    text-align: center;
+    color: #eee;
+
+    h2 {
+      margin: 0 0 0.25rem;
+      color: #ff5a4d;
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #bbb;
+    }
+  }
+}
