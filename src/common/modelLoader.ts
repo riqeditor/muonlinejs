@@ -244,3 +244,43 @@ export async function loadGLTF(filePath: string, world: World) {
     loadTask();
   });
 }
+
+/**
+ * thegame: partes de "efeito" das armas e asas (fogo da Flamberge, brilhos) usam texturas com
+ * fundo preto, que o MU original desenha somando à cena (aditivo). Os nomes das texturas se
+ * perderam na conversão, então a parte vira aditiva quando a textura é quase toda preta.
+ */
+const EFFECT_DARK_FRACTION = 0.5;
+const effectTextureCache = new Map<Texture, boolean>();
+
+async function isEffectTexture(texture: Texture): Promise<boolean> {
+  const cached = effectTextureCache.get(texture);
+  if (cached !== undefined) return cached;
+  let result = false;
+  try {
+    const pixels = (await texture.readPixels()) as Uint8Array | null;
+    if (pixels && pixels.length >= 4) {
+      let dark = 0;
+      let total = 0;
+      for (let i = 0; i < pixels.length; i += 16) {
+        total++;
+        if (pixels[i] + pixels[i + 1] + pixels[i + 2] < 60) dark++;
+      }
+      result = dark / total >= EFFECT_DARK_FRACTION;
+    }
+  } catch {
+    result = false;
+  }
+  effectTextureCache.set(texture, result);
+  return result;
+}
+
+export async function applyAdditiveToEffectMeshes(scene: Scene, meshes: AbstractMesh[]) {
+  await Promise.all(
+    meshes.map(async mesh => {
+      const texture = mesh.metadata?.diffuseTexture as Texture | undefined;
+      if (!texture || !(await isEffectTexture(texture))) return;
+      mesh.material = getMaterial(scene, false, 2, BlendState.ALPHA_ADD);
+    })
+  );
+}

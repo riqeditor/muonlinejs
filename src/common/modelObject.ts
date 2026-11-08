@@ -216,14 +216,25 @@ export class ModelObject {
       if (parent && parent.gltf?.skeleton) {
         const bone = parent.gltf.skeleton.bones[this.ParentBoneLink + 1];
         const node = bone.getTransformNode();
-        if (node && this._node.parent !== node) {
+        if (node && this._node.parent !== node && this.gltf) {
+          // thegame: o modelo convertido tem na raiz uma correção de eixos (gira -90° em X e
+          // espelha Y). O osso já está no espaço do MU, então o encaixe aplica o inverso exato
+          // dessa correção — antes era uma rotação fixa de 270°, que não desfazia o espelho e
+          // deixava a arma atravessada.
           this._node.setParent(node);
-          this._node.position.setAll(0);
-          this._node.rotationQuaternion = Quaternion.FromEulerAngles(
-            Math.PI * 1.5,
-            0,
-            0
-          );
+          const root = this.gltf.mesh;
+          const inverse = Matrix.Compose(
+            root.scaling,
+            root.rotationQuaternion ?? Quaternion.FromEulerVector(root.rotation),
+            root.position
+          ).invert();
+          const scaling = new Vector3();
+          const rotation = new Quaternion();
+          const position = new Vector3();
+          inverse.decompose(scaling, rotation, position);
+          this._node.scaling.copyFrom(scaling);
+          this._node.rotationQuaternion = rotation;
+          this._node.position.copyFrom(position);
 
           // const b = CreateBox('abc', { size: 0.1 }, this.scene);
           // b.setParent(node);

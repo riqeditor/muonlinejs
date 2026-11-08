@@ -8,7 +8,7 @@ import { ModelObject } from './modelObject';
 import { PlayerClass } from './types';
 import { Entity, World } from '../ecs/world';
 import { PlayerAction } from './objects/enum';
-import { loadGLTF } from './modelLoader';
+import { applyAdditiveToEffectMeshes, loadGLTF } from './modelLoader';
 import { Store } from '../store';
 
 export class PlayerObject extends ModelObject {
@@ -88,9 +88,13 @@ export class PlayerObject extends ModelObject {
 
     // 28 - r hand
     // 33 - r kine
+    // thegame: como no cliente original (MuMain), arma da direita no osso 33 ("knife") e
+    // arma/escudo da esquerda no osso 42 ("hand"). As armas têm esqueleto próprio: não podem
+    // usar o do personagem (LinkParent), senão o desenho é deslocado pelos ossos do corpo.
     this.Weapon1.LinkParent = false;
     this.Weapon1.ParentBoneLink = 33;
-    // this.Weapon2.ParentBoneLink = 36;//28;//42;
+    this.Weapon2.LinkParent = false;
+    this.Weapon2.ParentBoneLink = 42;
   }
 
   async init(world: World, entity: Entity) {
@@ -261,6 +265,11 @@ export class PlayerObject extends ModelObject {
       mesh.metadata.itemLvl = itemLvl ?? 0;
       mesh.metadata.isExcellent = isExcellent ?? false;
     });
+
+    // thegame: fogo/brilho de armas e asas com fundo preto → aditivo, como no MU.
+    if (part === this.Weapon1 || part === this.Weapon2 || part === this.Wings) {
+      await applyAdditiveToEffectMeshes(Store.world!.scene, meshes);
+    }
   }
 
   Update(gameTime: World['gameTime']): void {
