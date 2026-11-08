@@ -5,8 +5,12 @@ import { SKILL_DEFINITIONS, SkillKind } from '../../common/skills/skillDefinitio
 import { playSkillEffect } from '../../effects/skillEffects';
 import { Vector3 } from '../../libs/babylon/exports';
 import { PlayerAction } from '../../common/objects/enum';
+import { getAttackAction, getSkillAction, getWeaponKind } from '../../common/weaponAnimations';
 import { Store } from '../../store';
 import type { Entity, ISystemFactory, World } from '../world';
+
+/** Alterna entre os dois golpes (ou as duas mãos) a cada ataque. */
+let attackAlternate = false;
 
 // thegame: ataque básico do jogador local.
 // Clicar num monstro define o alvo (PlayerControllerSystem). Este sistema anda até
@@ -122,7 +126,12 @@ export const CombatSystem: ISystemFactory = world => {
       Store.sendAreaSkill(skill.number, Math.floor(tx), Math.floor(ty), direction, target?.netId ?? 0);
     }
 
-    player.playerAnimation.action = PlayerAction.PLAYER_ATTACK_FIST;
+    // thegame: animação conforme a arma (magia com as mãos, arco atira, armas golpeiam).
+    {
+      const kind = getWeaponKind(player.charAppearance?.leftHand ?? null, player.charAppearance?.rightHand ?? null);
+      attackAlternate = !attackAlternate;
+      player.playerAnimation.action = getSkillAction(kind, attackAlternate, kind === 'staff');
+    }
     player.playerAnimation.lockedUntil =
       world.gameTime.TotalGameTime.TotalSeconds + ATTACK_ANIMATION_TIME;
 
@@ -191,7 +200,12 @@ export const CombatSystem: ISystemFactory = world => {
 
       Store.sendHitRequest(targetId, direction);
 
-      player.playerAnimation.action = PlayerAction.PLAYER_ATTACK_FIST;
+      // thegame: golpe conforme a arma equipada (antes era sempre o soco).
+      attackAlternate = !attackAlternate;
+      player.playerAnimation.action = getAttackAction(
+        getWeaponKind(player.charAppearance?.leftHand ?? null, player.charAppearance?.rightHand ?? null),
+        attackAlternate
+      );
       player.playerAnimation.lockedUntil =
         world.gameTime.TotalGameTime.TotalSeconds + ATTACK_ANIMATION_TIME;
     },

@@ -3,6 +3,8 @@ import { MonsterActionType, PlayerAction } from '../../common/objects/enum';
 import type { MUAttributeSystem } from '../../libs/attributeSystem';
 import type { ISystemFactory } from '../world';
 import type { PlayerObject } from '../../common/playerObject';
+import { getStandWalkAction, getWeaponKind } from '../../common/weaponAnimations';
+import type { Item } from '../world';
 
 export const AnimationSystem: ISystemFactory = world => {
   const playersQuery = world.with(
@@ -24,7 +26,8 @@ export const AnimationSystem: ISystemFactory = world => {
 
   function calculateAnimation(
     attributeSystem: MUAttributeSystem,
-    velocity: IVector2Like
+    velocity: IVector2Like,
+    appearance?: { leftHand: Item | null; rightHand: Item | null }
   ) {
     const inSafeZone = attributeSystem.isAboveZero('inSafeZone');
     const isFemale = attributeSystem.isAboveZero('isFemale');
@@ -51,6 +54,12 @@ export const AnimationSystem: ISystemFactory = world => {
       }
 
       return PlayerAction.PLAYER_STOP_MALE;
+    }
+
+    // thegame: fora da safezone, pose e andar com a arma na mão (espada, arco, cajado…).
+    if (appearance && !isFlying && !isSwimming) {
+      const weaponAction = getStandWalkAction(getWeaponKind(appearance.leftHand, appearance.rightHand), isMoving);
+      if (weaponAction !== null) return weaponAction;
     }
 
     if (isSpearEquipped) {
@@ -122,11 +131,8 @@ export const AnimationSystem: ISystemFactory = world => {
   return {
     update: () => {
       // calculate current anim
-      for (const {
-        playerAnimation,
-        movement,
-        attributeSystem,
-      } of playersQuery) {
+      for (const entity of playersQuery) {
+        const { playerAnimation, movement, attributeSystem } = entity;
         // thegame: a morte fica até o renascer; outras animações "travadas" (ataque, golpe)
         // duram só até lockedUntil. Antes o ataque ficava preso para sempre.
         if (playerAnimation.action === PlayerAction.PLAYER_DIE1) {
@@ -141,7 +147,8 @@ export const AnimationSystem: ISystemFactory = world => {
         playerAnimation.lockedUntil = undefined;
         playerAnimation.action = calculateAnimation(
           attributeSystem,
-          movement.velocity
+          movement.velocity,
+          entity.charAppearance
         );
       }
 

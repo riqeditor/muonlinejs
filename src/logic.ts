@@ -45,6 +45,7 @@ import {
   ServerMessagePacket,
 } from './common/packets/ServerToClientPackets';
 import { ServerToClientActionMap } from './common/playerActionMapper';
+import { getAttackAction, getWeaponKind } from './common/weaponAnimations';
 import { PlayerObject } from './common/playerObject';
 import { Entity, World, type Item } from './ecs/world';
 import { createAttributeSystem } from './libs/attributeSystem';
@@ -635,7 +636,14 @@ EventBus.on('ObjectAnimation', packet => {
     obj.monsterAnimation.action = clientActionToPlay as any;
     obj.monsterAnimation.lockedUntil = lockedUntil;
   } else if (obj.playerAnimation) {
-    const action = ServerToClientActionMap[clientActionToPlay];
+    let action = ServerToClientActionMap[clientActionToPlay];
+    // thegame: ataque de outros jogadores conforme a arma deles (antes era sempre soco).
+    if (action === PlayerAction.PLAYER_ATTACK_FIST) {
+      action = getAttackAction(
+        getWeaponKind(obj.charAppearance?.leftHand ?? null, obj.charAppearance?.rightHand ?? null),
+        clientActionToPlay === ServerPlayerActionType.Attack2
+      );
+    }
     if (action !== undefined) {
       obj.playerAnimation.action = action;
       obj.playerAnimation.lockedUntil = lockedUntil;
