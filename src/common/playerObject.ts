@@ -8,6 +8,7 @@ import { ModelObject } from './modelObject';
 import { PlayerClass } from './types';
 import { Entity, World } from '../ecs/world';
 import { PlayerAction } from './objects/enum';
+import { TWFlags } from './terrain/consts';
 import { applyAdditiveToEffectMeshes, loadGLTF } from './modelLoader';
 import { Store } from '../store';
 
@@ -95,9 +96,18 @@ export class PlayerObject extends ModelObject {
     this.Weapon1.ParentBoneLink = 33;
     this.Weapon2.LinkParent = false;
     this.Weapon2.ParentBoneLink = 42;
+    // Na safezone, como no MU, as armas ficam guardadas nas costas (osso Spine1), cruzadas
+    // em X: cabo de cada uma num ombro. Valores acertados vendo o personagem de costas.
+    this.Weapon1.BackLink = { bone: 18, position: [0.3, 0.3, -0.25], rotation: [0, -0.6, -Math.PI / 2] };
+    this.Weapon2.BackLink = { bone: 18, position: [0.3, -0.3, -0.28], rotation: [0, 0.6, -Math.PI / 2] };
   }
 
+  private _entity?: Entity;
+  private _world?: World;
+
   async init(world: World, entity: Entity) {
+    this._entity = entity;
+    this._world = world;
     await super.init(world, entity);
 
     this.load(await loadGLTF('Player/player.glb', world));
@@ -274,6 +284,15 @@ export class PlayerObject extends ModelObject {
 
   Update(gameTime: World['gameTime']): void {
     super.Update(gameTime);
+
+    // thegame: arma nas costas enquanto o personagem está na safezone.
+    // Lê a marca de safezone do chão onde o personagem está (a marca 'inSafeZone' do
+    // personagem só é atualizada ao andar, e ficava velha depois de um teleporte).
+    const pos = this._entity?.transform?.pos;
+    const flag = pos && this._world ? this._world.getTerrainFlag(Math.round(pos.x), Math.round(pos.z)) : 0;
+    const onBack = (flag & TWFlags.SafeZone) !== 0;
+    this.Weapon1.OnBack = onBack;
+    this.Weapon2.OnBack = onBack;
 
     // Update all children
     for (const child of this.Children) {

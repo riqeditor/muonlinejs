@@ -61,6 +61,11 @@ export class ModelObject {
   Light = new Vector3(0, 0, 0);
 
   ParentBoneLink = -1;
+  /** thegame: encaixe nas costas (osso, posição e rotação no espaço do osso), usado na safezone. */
+  BackLink: { bone: number; position: [number, number, number]; rotation: [number, number, number] } | null = null;
+  /** thegame: true quando a arma deve ficar nas costas (personagem na safezone). */
+  OnBack = false;
+  private _linkMode: 'hand' | 'back' | '' = '';
   private _node: TransformNode;
   gltf: {
     mesh: AbstractMesh;
@@ -213,34 +218,42 @@ export class ModelObject {
 
     if (this.ParentBoneLink >= 0) {
       const parent = this.Parent;
-      if (parent && parent.gltf?.skeleton) {
-        const bone = parent.gltf.skeleton.bones[this.ParentBoneLink + 1];
-        const node = bone.getTransformNode();
-        if (node && this._node.parent !== node && this.gltf) {
-          // thegame: o modelo convertido tem na raiz uma correção de eixos (gira -90° em X e
-          // espelha Y). O osso já está no espaço do MU, então o encaixe aplica o inverso exato
-          // dessa correção — antes era uma rotação fixa de 270°, que não desfazia o espelho e
-          // deixava a arma atravessada.
+      if (parent && parent.gltf?.skeleton && this.gltf) {
+        // thegame: na safezone a arma vai para as costas (BackLink), fora dela fica na mão.
+        const back = this.OnBack ? this.BackLink : null;
+        const boneIndex = back ? back.bone : this.ParentBoneLink;
+        const bone = parent.gltf.skeleton.bones[boneIndex + 1];
+        const node = bone?.getTransformNode();
+        const mode = back ? 'back' : 'hand';
+        if (node && (this._node.parent !== node || this._linkMode !== mode)) {
+          this._linkMode = mode;
           this._node.setParent(node);
+          // O modelo convertido tem na raiz uma correção de eixos (gira -90° em X e espelha Y).
+          // O osso já está no espaço do MU, então o encaixe aplica o inverso exato dessa
+          // correção (antes era uma rotação fixa de 270°, que deixava a arma atravessada).
+          // Nas costas, soma a posição/inclinação do BackLink no espaço do osso.
           const root = this.gltf.mesh;
-          const inverse = Matrix.Compose(
+          let local = Matrix.Compose(
             root.scaling,
             root.rotationQuaternion ?? Quaternion.FromEulerVector(root.rotation),
             root.position
           ).invert();
+          if (back) {
+            local = local.multiply(
+              Matrix.Compose(
+                Vector3.One(),
+                Quaternion.FromEulerAngles(back.rotation[0], back.rotation[1], back.rotation[2]),
+                new Vector3(back.position[0], back.position[1], back.position[2])
+              )
+            );
+          }
           const scaling = new Vector3();
           const rotation = new Quaternion();
           const position = new Vector3();
-          inverse.decompose(scaling, rotation, position);
+          local.decompose(scaling, rotation, position);
           this._node.scaling.copyFrom(scaling);
           this._node.rotationQuaternion = rotation;
           this._node.position.copyFrom(position);
-
-          // const b = CreateBox('abc', { size: 0.1 }, this.scene);
-          // b.setParent(node);
-          // b.position.setAll(0);
-          // b.scaling.setAll(1);
-          // b.rotationQuaternion = Quaternion.Identity();
         }
       }
     }
