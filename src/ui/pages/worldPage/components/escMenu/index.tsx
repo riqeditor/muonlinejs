@@ -31,7 +31,7 @@ export const EscMenu = observer(() => {
     <div className="esc-menu-backdrop" onPointerDown={close}>
       <div className="esc-menu" onPointerDown={e => e.stopPropagation()}>
         <div className="title">Menu</div>
-        <button
+        <button className="mu-button"
           onClick={() => {
             close();
             Store.sendLogout(1);
@@ -39,7 +39,7 @@ export const EscMenu = observer(() => {
         >
           Trocar de personagem
         </button>
-        <button
+        <button className="mu-button"
           onClick={() => {
             close();
             Store.sendLogout(0);
@@ -49,7 +49,7 @@ export const EscMenu = observer(() => {
         >
           Sair do jogo
         </button>
-        <button className="secondary" onClick={close}>
+        <button className="mu-button small" onClick={close}>
           Voltar ao jogo (Esc)
         </button>
       </div>

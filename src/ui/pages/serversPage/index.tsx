@@ -8,6 +8,7 @@ import {
 } from '../../../common/packets/ConnectServerPackets';
 import { useEventBus } from '../../../hooks/useEventBus';
 import { CS_HOST } from '../../../consts';
+import { TitleBackground, TitleFooter, TitleLogo } from '../../components/titleScreen';
 
 // thegame: o servidor tem um único game server. Não há tela de escolher servidor:
 // assim que o connect server manda a lista, o cliente pede a conexão do primeiro
@@ -39,8 +40,11 @@ export const ServersPage = observer(() => {
   });
 
   return (
-    <div className="servers-page">
-      <span>Conectando ao servidor…</span>
+    <div className="servers-page title-page">
+      <TitleBackground />
+      <TitleLogo />
+      <span className="connecting">Conectando ao servidor…</span>
+      <TitleFooter />
     </div>
   );
 });

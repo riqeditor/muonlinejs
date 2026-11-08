@@ -288,3 +288,49 @@
     margin-bottom: 0.25rem;
   }
 }
+
+// thegame: tema 0.97d (pedra escura, moldura dourada) por cima do estilo base.
+.inventory {
+  background: linear-gradient(180deg, rgba(34, 29, 22, 0.97), rgba(14, 12, 9, 0.97));
+  border: 1px solid #7a6237;
+  outline: 1px solid #000;
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.6), inset 0 0 0 4px rgba(201, 154, 62, 0.35), -4px 0 18px rgba(0, 0, 0, 0.7);
+  color: #e8dcc0;
+
+  .title {
+    font-family: Georgia, serif;
+    letter-spacing: 0.08em;
+    color: #f1d58f;
+    text-shadow: 0 1px 2px #000;
+  }
+
+  .equipment .equipment-item {
+    border: 1px solid #6c5631;
+    border-radius: 2px;
+    background: radial-gradient(circle, #1d1912 0%, #0a0907 100%);
+    box-shadow: inset 0 0 6px #000;
+  }
+
+  .inventory-items {
+    background-color: #000;
+    border: 1px solid #6c5631;
+
+    .bag-cell {
+      background-color: #14110c;
+      border: 1px solid #2a241a;
+    }
+
+    .inventory-item {
+      border-color: transparent;
+      background-color: transparent;
+
+      &.used .bg {
+        background-color: rgba(60, 90, 160, 0.18);
+      }
+    }
+  }
+
+  .zen {
+    color: #f1d58f;
+  }
+}

@@ -6,7 +6,6 @@ import { BottomBar } from './components/bottomBar';
 import { CharacterInfo } from './components/characterInfo';
 import { Inventory } from './components/inventory';
 import { ChatBox } from './components/chatBox';
-import { SkillBar } from './components/skillBar';
 import { MapLoadingOverlay } from './components/mapLoading';
 import { EscMenu } from './components/escMenu';
 import { CombatOverlay } from './components/combatOverlay';
@@ -19,7 +18,6 @@ const HUD = observer(() => {
         <Inventory />
         <CharacterInfo />
       </div>
-      <SkillBar />
       <MapsList />
       <ChatBox />
     </div>

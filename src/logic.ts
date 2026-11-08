@@ -1101,6 +1101,27 @@ EventBus.on('ItemDropResponse', packet => {
   Store.syncPlayerAppearance();
 });
 
+// thegame: C1 2A ItemDurabilityChanged — ex.: poção usada (a quantidade é a "durabilidade").
+EventBus.on('ItemDurabilityChanged', packet => {
+  if (packet.byteLength < 5) return;
+  const slot = packet.getUint8(3);
+  const durability = packet.getUint8(4);
+  runInAction(() => {
+    const item = Store.playerData.items[slot];
+    if (item) Store.playerData.items[slot] = { ...item, durability };
+  });
+});
+
+// thegame: C1 28 ItemRemoved — item sumiu do inventário (ex.: última poção usada).
+EventBus.on('ItemRemoved', packet => {
+  if (packet.byteLength < 4) return;
+  const slot = packet.getUint8(3);
+  runInAction(() => {
+    Store.playerData.items[slot] = null as unknown as Item;
+  });
+  Store.syncPlayerAppearance();
+});
+
 // thegame: C3 F1 02 LogoutResponse. Também chega quando o servidor manda o jogador de
 // volta à seleção de personagem (ex.: depois do reset).
 EventBus.on('LogoutResponse', packet => {

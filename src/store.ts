@@ -792,6 +792,13 @@ export const Store = new (class _Store {
     this.sendToGS(new DataView(bytes.buffer));
   }
 
+  /** C3 26 ConsumeItemRequest: usa o item do slot (poção, antídoto…). */
+  consumeItem(slot: number): void {
+    if (!this.playerData.items[slot]) return;
+    const bytes = new Uint8Array([0xc3, 6, 0x26, slot, 0, 0]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
   /** C3 23 DropItemRequest: joga o item do slot `slot` no chão em (x, y). */
   sendDropItem(slot: number, x: number, y: number): void {
     if (!this.playerData.items[slot]) return;

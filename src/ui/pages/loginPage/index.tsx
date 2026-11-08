@@ -7,7 +7,7 @@ import {
   LoginResponsePacket,
 } from '../../../common/packets/ServerToClientPackets';
 import { MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH } from '../../../consts';
-import { FanDisclaimer } from '../../components/fanDisclaimer';
+import { TitleBackground, TitleFooter, TitleLogo } from '../../components/titleScreen';
 
 const Result = LoginResponseLoginResultEnum;
 
@@ -64,18 +64,20 @@ export const LoginPage = observer(() => {
   };
 
   return (
-    <div className="login-page">
+    <div className="login-page title-page">
+      <TitleBackground />
+      <TitleLogo />
       <form
-        className="login-panel"
+        className="login-panel mu-window"
         onSubmit={e => {
           e.preventDefault();
           onLoginClicked();
         }}
       >
-        <h2>Entrar</h2>
+        <h2>Conectar</h2>
 
         <label>
-          <span>Usuário</span>
+          <span>Conta</span>
           <input
             type="text"
             autoComplete="username"
@@ -102,7 +104,7 @@ export const LoginPage = observer(() => {
         </label>
 
         <p className="login-hint">
-          Usuário e senha: até {MAX_USERNAME_LENGTH} caracteres cada.
+          Conta e senha: até {MAX_USERNAME_LENGTH} caracteres cada.
         </p>
 
         {!!Store.loginError && (
@@ -111,12 +113,12 @@ export const LoginPage = observer(() => {
           </p>
         )}
 
-        <button type="submit" disabled={!canSubmit}>
+        <button type="submit" className="mu-button" disabled={!canSubmit}>
           {Store.loginProcessing ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
 
-      <FanDisclaimer />
+      <TitleFooter />
     </div>
   );
 });
