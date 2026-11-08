@@ -96,10 +96,12 @@ export class PlayerObject extends ModelObject {
     this.Weapon1.ParentBoneLink = 33;
     this.Weapon2.LinkParent = false;
     this.Weapon2.ParentBoneLink = 42;
-    // Na safezone, como no MU, as armas ficam guardadas nas costas (osso Spine1), cruzadas
-    // em X: cabo de cada uma num ombro. Valores acertados vendo o personagem de costas.
-    this.Weapon1.BackLink = { bone: 18, position: [0.3, 0.3, -0.25], rotation: [0, -0.6, -Math.PI / 2] };
-    this.Weapon2.BackLink = { bone: 18, position: [0.3, -0.3, -0.28], rotation: [0, 0.6, -Math.PI / 2] };
+    // Na safezone, como no MU, as armas ficam guardadas nas costas (osso Spine1): deitadas
+    // na diagonal e coladas nas costas. Arma da esquerda (escudo, arco, 2ª arma): cabo atrás
+    // do ombro esquerdo, ponta no quadril direito; a da direita, espelhada. Valores calculados
+    // medindo o corpo (neste osso: X = para cima, Y = para trás, Z = para o lado).
+    this.Weapon1.BackLink = { bone: 18, position: [0.307, -0.187, -0.103], rotation: [0, 0.394, -1.562] };
+    this.Weapon2.BackLink = { bone: 18, position: [0.307, -0.17, 0.098], rotation: [0, 2.749, 1.571] };
   }
 
   private _entity?: Entity;
