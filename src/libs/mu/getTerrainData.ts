@@ -70,8 +70,27 @@ export async function getTerrainData(world: World, map: ENUM_WORLD) {
   const terrainTextures = (
     await Promise.all(
       textureNames.map(async (t, i) => {
-        const filePath = `World${worldNum}/${t}.OZJ`;
-        const ozjBytes = await downloadDataBytesBuffer(filePath);
+        // thegame: alguns mapas não têm todas as texturas da lista (ex.: Arena/World7 não tem
+        // TileGround01). Sem o arquivo, o servidor de arquivos devolve uma página HTML e o
+        // carregamento travava. Nesse caso usa uma textura parecida que exista na pasta.
+        const candidates = [t, t.replace(/\d+$/, n => String(Number(n) + 1).padStart(n.length, '0')), 'TileGround02', 'TileGrass01'];
+        let filePath = `World${worldNum}/${t}.OZJ`;
+        let ozjBytes: Awaited<ReturnType<typeof downloadDataBytesBuffer>> | null = null;
+        for (const name of candidates) {
+          filePath = `World${worldNum}/${name}.OZJ`;
+          try {
+            const bytes = await downloadDataBytesBuffer(filePath);
+            const first = bytes.byteLength > 0 ? new Uint8Array(bytes.buffer, bytes.byteOffset, 1)[0] : 0;
+            if (bytes.byteLength > 0 && first !== 0x3c /* '<' = HTML */) {
+              ozjBytes = bytes;
+              break;
+            }
+          } catch {
+            // tenta a próxima
+          }
+          console.warn(`textura do terreno ausente: ${filePath}`);
+        }
+        if (!ozjBytes) throw new Error(`Nenhuma textura encontrada para ${t} em World${worldNum}`);
 
         return readOJZBufferAsJPEGBuffer(
           scene,

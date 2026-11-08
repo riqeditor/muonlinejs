@@ -362,6 +362,10 @@ export const Store = new (class _Store {
 
   /** Nome do personagem escolhido para entrar no jogo (usado no chat). */
   characterName = '';
+  /** Nome da classe do personagem em jogo (ex.: 'Magic Gladiator'). */
+  characterClassName = '';
+  /** Janela de teleporte (tecla M) aberta. */
+  warpListOpen = false;
   chatMessages: ChatEntry[] = [];
   chatOpen = false;
   chatInput = '';
@@ -435,6 +439,8 @@ export const Store = new (class _Store {
       playerDead: observable,
       mapLoading: observable,
       escMenuOpen: observable,
+      characterClassName: observable,
+      warpListOpen: observable,
       heldItemSlot: observable,
       skills: observable,
       selectedSkill: observable,
@@ -823,6 +829,19 @@ export const Store = new (class _Store {
       }),
       DAMAGE_POPUP_DURATION_MS
     );
+  }
+
+  /** C1 8E 02 WarpCommandRequest: teleporte pela lista de destinos do servidor (WarpInfo.Index). */
+  sendWarpRequest(warpIndex: number): void {
+    const bytes = new Uint8Array(10);
+    bytes[0] = 0xc1;
+    bytes[1] = 10;
+    bytes[2] = 0x8e;
+    bytes[3] = 0x02;
+    // bytes 4..7: CommandKey (o OpenMU não confere); bytes 8..9: índice em little endian.
+    bytes[8] = warpIndex & 0xff;
+    bytes[9] = (warpIndex >> 8) & 0xff;
+    this.sendToGS(new DataView(bytes.buffer));
   }
 
   sendClientReadyAfterMapChange(): void {

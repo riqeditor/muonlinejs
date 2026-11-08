@@ -75,6 +75,8 @@ export const CharactersPage = observer(() => {
   };
 
   const onCharacterSelect = (name: string) => {
+    const chosen = Store.charactersList.find(c => c.Name === name);
+    Store.characterClassName = chosen ? getCharacterClassName(getClassFromAppearance(chosen.Appearance)) : '';
     Store.selectCharacterRequest(name);
   };
 
