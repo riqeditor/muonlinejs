@@ -1150,6 +1150,90 @@ EventBus.on('CharacterStatIncreaseResponse', packet => {
   });
 });
 
+// ---------- thegame: NPCs (loja). Fluxo do OpenMU (TalkNpcAction): C3 30 com o tipo de
+// janela e, para lojas, C2 31 com os itens à venda. ----------
+
+/** Janelas de NPC que o cliente sabe mostrar (OpenMU NpcWindow). */
+const NPC_WINDOW_MERCHANT = 0;
+const NPC_WINDOW_MERCHANT1 = 1;
+
+EventBus.on('NpcWindowResponse', packet => {
+  if (packet.byteLength < 4) return;
+  const window = packet.getUint8(3);
+  runInAction(() => {
+    Store.npcWindow = window;
+    Store.shopItems = [];
+    if (window === NPC_WINDOW_MERCHANT || window === NPC_WINDOW_MERCHANT1) Store.inventoryEnabled = true;
+  });
+});
+
+// C2 31 StoreItemList: [C2, len hi, len lo, 31, tipo, quantidade, (posição + 12 bytes do item) x N].
+EventBus.on('StoreItemList', packet => {
+  if (packet.byteLength < 6) return;
+  const count = packet.getUint8(5);
+  const items: (Item | null)[] = [];
+  const ITEM_SIZE = 12;
+  for (let i = 0; i < count; i++) {
+    const offset = 6 + i * (1 + ITEM_SIZE);
+    if (offset + 1 + ITEM_SIZE > packet.byteLength) break;
+    const slot = packet.getUint8(offset);
+    const bytes = new Uint8Array(packet.buffer, packet.byteOffset + offset + 1, ITEM_SIZE);
+    try {
+      items[slot] = ItemSerializer.DeserializeItem(new Uint8Array(bytes));
+    } catch (e) {
+      console.warn('item da loja não lido', slot, e);
+    }
+  }
+  runInAction(() => (Store.shopItems = items));
+});
+
+// C1 32 ItemBought [slot do inventário, 12 bytes] ou C1 32 FF (compra falhou).
+EventBus.on('ItemBought', packet => onNpcBuyResponse(packet));
+EventBus.on('NpcItemBuyFailed', packet => onNpcBuyResponse(packet));
+function onNpcBuyResponse(packet: DataView) {
+  if (packet.byteLength < 4) return;
+  const slot = packet.getUint8(3);
+  if (slot === 0xff || packet.byteLength < 4 + 12) {
+    runInAction(() => Store.addChatMessage('system', 'Não foi possível comprar (zen ou espaço insuficiente).'));
+    return;
+  }
+  const bytes = new Uint8Array(packet.buffer, packet.byteOffset + 4, 12);
+  try {
+    const item = ItemSerializer.DeserializeItem(new Uint8Array(bytes));
+    runInAction(() => {
+      Store.playerData.items[slot] = item;
+    });
+  } catch (e) {
+    console.warn('item comprado não lido', e);
+  }
+}
+
+// C3 33 NpcItemSellResult [sucesso, zen LE32].
+EventBus.on('NpcItemSellResult', packet => {
+  if (packet.byteLength < 8) return;
+  const success = packet.getUint8(3) !== 0;
+  const money = packet.getUint32(4, true);
+  runInAction(() => {
+    const slot = Store.pendingSellSlot;
+    Store.pendingSellSlot = null;
+    if (success) {
+      if (slot !== null) Store.playerData.items[slot] = null as unknown as Item;
+      Store.playerData.money = money;
+    } else {
+      Store.addChatMessage('system', 'Este item não pode ser vendido.');
+    }
+  });
+  Store.syncPlayerAppearance();
+});
+
+// C1 34 ItemRepairResponse [?, zen LE32] — não está nas definições antigas do cliente.
+EventBus.on('unknownPacket', ({ code, packet }) => {
+  if (code === 0x34 && packet.getUint8(0) === 0xc1 && packet.byteLength >= 8) {
+    const money = packet.getUint32(4, true);
+    runInAction(() => (Store.playerData.money = money));
+  }
+});
+
 // thegame: C1 2A ItemDurabilityChanged — ex.: poção usada (a quantidade é a "durabilidade").
 EventBus.on('ItemDurabilityChanged', packet => {
   if (packet.byteLength < 5) return;

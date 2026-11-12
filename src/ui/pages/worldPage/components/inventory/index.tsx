@@ -22,6 +22,7 @@ import {
 // Clique direito: equipa (mochila) ou desequipa (equipamento). Esc cancela.
 
 const isEquipmentSlot = (slot: number) => slot < FIRST_BAG_SLOT;
+const isMerchantOpen = () => Store.npcWindow === 0 || Store.npcWindow === 1;
 
 /** Coloca o item "na mão" no slot `slot` (equipamento ou mochila). */
 function placeHeldItem(slot: number) {
@@ -77,6 +78,11 @@ function onSlotRightClick(slot: number) {
     Store.heldItemDragging = false;
   });
   if (!Store.playerData.items[slot]) return;
+  // thegame: com a loja de um NPC aberta, clique direito na mochila vende o item.
+  if (isMerchantOpen() && !isEquipmentSlot(slot)) {
+    Store.sellToNpc(slot);
+    return;
+  }
   if (isEquipmentSlot(slot)) Store.unequipItem(slot);
   else Store.equipItem(slot);
 }
@@ -111,7 +117,7 @@ const HeldItemCursor = observer(() => {
   );
 });
 
-const ItemTooltip = ({ item, children }: { item: Item | null; children: React.ReactNode }) => {
+export const ItemTooltip = ({ item, children }: { item: Item | null; children: React.ReactNode }) => {
   const [isVisible, setIsVisible] = useState(false);
   const lines = item && isVisible ? describeItem(item) : [];
 
@@ -236,7 +242,9 @@ export const Inventory = observer(() => {
       <BagGrid />
       <div className="zen">Zen: {playerData.money.toLocaleString('pt-BR')}</div>
       <div className="inventory-hint">
-        Arraste ou clique para mover · solte no chão para jogar fora · botão direito: equipar · Esc: cancelar
+        {isMerchantOpen()
+          ? 'Loja aberta: botão direito na mochila vende o item'
+          : 'Arraste ou clique para mover · solte no chão para jogar fora · botão direito: equipar · Esc: cancelar'}
       </div>
       <HeldItemCursor />
     </div>

@@ -453,6 +453,10 @@ export const Store = new (class _Store {
       notifications: observable,
       world: observable,
       characterInfoEnabled: observable,
+      npcWindow: observable,
+      shopItems: observable,
+      pendingSellSlot: observable,
+      closeNpc: action,
       inventoryEnabled: observable,
     });
     this.loadConfig();
@@ -814,6 +818,51 @@ export const Store = new (class _Store {
 
   /** Pontos pedidos ao servidor e ainda não confirmados (evita gastar além dos livres). */
   pendingStatPoints = 0;
+
+  // ---------- thegame: NPCs (loja, baú…) ----------
+
+  /** Janela de NPC aberta (OpenMU NpcWindow: 0/1 loja, 2 baú, 3 Chaos Machine…) ou null. */
+  npcWindow: number | null = null;
+  /** Itens à venda na loja aberta (posição na grade 8 colunas → item). */
+  shopItems: (Item | null)[] = [];
+  /** Slot do inventário que está sendo vendido (aguardando C3 33). */
+  pendingSellSlot: number | null = null;
+
+  /** C3 30 TalkToNpcRequest. */
+  talkToNpc(npcId: number): void {
+    const bytes = new Uint8Array([0xc3, 5, 0x30, (npcId >> 8) & 0xff, npcId & 0xff]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 31 CloseNpcRequest: fecha a janela do NPC (o servidor libera o jogador). */
+  closeNpc(): void {
+    if (this.npcWindow === null) return;
+    this.npcWindow = null;
+    this.shopItems = [];
+    this.pendingSellSlot = null;
+    const bytes = new Uint8Array([0xc1, 3, 0x31]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C3 32 BuyItemFromNpcRequest: compra o item da posição `slot` da loja. */
+  buyFromNpc(slot: number): void {
+    const bytes = new Uint8Array([0xc3, 4, 0x32, slot]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C3 33 SellItemToNpcRequest: vende o item do slot do inventário. */
+  sellToNpc(slot: number): void {
+    if (!this.playerData.items[slot] || this.pendingSellSlot !== null) return;
+    this.pendingSellSlot = slot;
+    const bytes = new Uint8Array([0xc3, 4, 0x33, slot]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 34 RepairItemRequest: conserta o item do slot (0xFF = tudo o que está equipado e na mochila). */
+  repairItem(slot: number): void {
+    const bytes = new Uint8Array([0xc1, 5, 0x34, slot, 0]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
 
   /** C3 26 ConsumeItemRequest: usa o item do slot (poção, antídoto…). */
   consumeItem(slot: number): void {

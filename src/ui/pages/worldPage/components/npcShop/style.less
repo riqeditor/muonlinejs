@@ -1,0 +1,53 @@
+// thegame: loja de NPC, ao lado do inventário, no mesmo tema 0.97d.
+.npc-shop {
+  .shop-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(8, 32px);
+    gap: 1px;
+    background: #000;
+    border: 1px solid #6c5631;
+
+    .shop-cell {
+      background-color: #14110c;
+      border: 1px solid #2a241a;
+      box-sizing: border-box;
+    }
+
+    .shop-item {
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(60, 90, 160, 0.18);
+      border: 1px solid rgba(201, 154, 62, 0.25);
+      box-sizing: border-box;
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(201, 154, 62, 0.22);
+        border-color: #d8b25a;
+      }
+
+      .tooltip {
+        position: static;
+      }
+
+      .item-icon {
+        transform: scale(1.4);
+        pointer-events: none;
+      }
+    }
+  }
+
+  .shop-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 4px;
+
+    .mu-button {
+      flex: 1;
+    }
+  }
+}

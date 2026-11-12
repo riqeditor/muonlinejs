@@ -10,12 +10,14 @@ import { MapLoadingOverlay } from './components/mapLoading';
 import { EscMenu } from './components/escMenu';
 import { CombatOverlay } from './components/combatOverlay';
 import { MiniMap } from './components/miniMap';
+import { NpcShop } from './components/npcShop';
 
 const HUD = observer(() => {
   return (
     <div className="hud">
       <BottomBar />
       <div className="panels-stack">
+        <NpcShop />
         <Inventory />
         <CharacterInfo />
       </div>

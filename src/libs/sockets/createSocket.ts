@@ -125,6 +125,12 @@ export function createSocket({ wsAddress, tcpIP, tcpPort }: Options) {
         (subCode !== undefined ? ` (0x${byteToString(subCode)})` : '') +
         ` lng:${length}`
       );
+      // thegame: avisa quem quiser tratar um pacote que as definições antigas não conhecem.
+      try {
+        EventBus.emit('unknownPacket', { code: packetCode, subCode, packet });
+      } catch (e) {
+        console.error(`${LOG_PREFIX}erro ao tratar pacote desconhecido`, e);
+      }
       return;
     }
 

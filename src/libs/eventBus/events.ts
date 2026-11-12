@@ -25,6 +25,8 @@ export type Events = CSEvents &
     };
     requestWarp: { map: ENUM_WORLD; pos?: { x: number; y: number } };
     warpCompleted: { map: ENUM_WORLD };
+    /** thegame: pacote que as definições geradas não conhecem (código, subcódigo, bytes). */
+    unknownPacket: { code: number; subCode?: number; packet: DataView };
     keyPressed: string;
     keyReleased: string;
     pageVisibilityChanged: boolean;

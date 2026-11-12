@@ -15,6 +15,8 @@ export const EscMenu = observer(() => {
       if (Store.heldItemSlot !== null) {
         Store.heldItemSlot = null;
         Store.heldItemDragging = false;
+      } else if (Store.npcWindow !== null) {
+        Store.closeNpc();
       } else if (Store.warpListOpen) {
         Store.warpListOpen = false;
       } else if (Store.inventoryEnabled) {

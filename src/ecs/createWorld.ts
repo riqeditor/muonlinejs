@@ -21,6 +21,7 @@ import { InteractiveAreaSystem } from './systems/interactiveAreaSystem';
 import { WalkSfxSystem } from './systems/walkSfxSystem';
 import { CombatSystem } from './systems/combatSystem';
 import { PickupSystem } from './systems/pickupSystem';
+import { NpcTalkSystem } from './systems/npcTalkSystem';
 
 const factories: ISystemFactory[] = [
   ModelLoaderSystem,
@@ -30,6 +31,7 @@ const factories: ISystemFactory[] = [
   PlayerControllerSystem,
   CombatSystem,
   PickupSystem,
+  NpcTalkSystem,
   PathfindingSystem,
   CalculateVisibilitySystem,
   CalculateScreenPositionSystem,

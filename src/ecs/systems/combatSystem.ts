@@ -53,6 +53,13 @@ export function isAttackable(entity: Entity | null | undefined): boolean {
   return kind === 'monster' || kind === 'trap';
 }
 
+/** thegame: NPC com quem dá para conversar (lojas, baú, Chaos Goblin, guardas…). */
+export function isTalkableNpc(entity: Entity | null | undefined): boolean {
+  if (!entity || entity.npcType === undefined || entity.netId === undefined) return false;
+  if (entity.dead || entity.objOutOfScope) return false;
+  return MONSTER_MODELS[entity.npcType]?.[1] === 'npc';
+}
+
 function getAttackRange(world: World): number {
   const cls = world.playerEntity?.attributeSystem?.getValue('playerNetClass') as
     | CharacterClassNumber

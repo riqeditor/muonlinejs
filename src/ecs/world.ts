@@ -173,6 +173,8 @@ export class World extends ECSWorld<Entity> {
   pendingSkill: { number: number; targetNetId: number | null; x: number; y: number } | null = null;
   /** thegame: netId do item no chão que o jogador local vai pegar (null = nenhum). */
   pickupTargetNetId: number | null = null;
+  /** thegame: NPC com quem o jogador quer falar (anda até ele e manda C3 30). */
+  talkTargetNetId: number | null = null;
 
   pointerPressed = false;
 

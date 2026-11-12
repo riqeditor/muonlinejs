@@ -6,7 +6,7 @@ import {
 import type { ISystemFactory } from '../world';
 import { Store } from '../../store';
 import { runInAction } from 'mobx';
-import { isAttackable } from './combatSystem';
+import { isAttackable, isTalkableNpc } from './combatSystem';
 import { CLICK_PICKUP_RADIUS, findGroundItemNear } from './pickupSystem';
 
 const MOVE_DELAY = 0.25;
@@ -161,9 +161,18 @@ export const PlayerControllerSystem: ISystemFactory = world => {
     if (isAttackable(target)) {
       world.attackTargetNetId = target!.netId!;
       world.pickupTargetNetId = null;
+      world.talkTargetNetId = null;
       return;
     }
     world.attackTargetNetId = null;
+
+    // thegame: clique num NPC (vendedor, baú, Chaos Goblin…) = andar até ele e conversar.
+    if (isTalkableNpc(target)) {
+      world.talkTargetNetId = target!.netId!;
+      world.pickupTargetNetId = null;
+      return;
+    }
+    world.talkTargetNetId = null;
 
     const pickInfo = scene.pick(
       lastClientX,
