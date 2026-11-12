@@ -60,6 +60,16 @@ export const AppearanceSystem: ISystemFactory = world => {
           playerObject.Weapon2
         ) || playerObject.Weapon2.Unload();
 
+        // thegame: asas e montaria (antes não apareciam no personagem).
+        if (!loadPart(charAppearance.wings, playerObject, playerObject.Wings)) {
+          playerObject.Wings.Unload();
+          playerObject.Wings.gltf?.mesh.setEnabled(false);
+        } else {
+          playerObject.Wings.gltf?.mesh.setEnabled(true);
+        }
+        const pet = charAppearance.pet;
+        playerObject.setMountAsync(pet && pet.group === 13 ? pet.num : null);
+
         if (attributeSystem) {
           if (charAppearance.leftHand) {
             const group = charAppearance.leftHand.group;

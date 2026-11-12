@@ -284,3 +284,47 @@ export async function applyAdditiveToEffectMeshes(scene: Scene, meshes: Abstract
     })
   );
 }
+
+/**
+ * thegame: alguns .glb convertidos (ex.: Skill/Rider01.glb, a Uniria) têm as imagens embutidas
+ * mas sem ligação com os materiais, e aparecem brancos. Lê as imagens soltas de dentro do
+ * arquivo e liga a imagem i à parte i do modelo. Não altera o arquivo.
+ */
+export async function attachLooseGlbImages(scene: Scene, filePath: string, meshes: AbstractMesh[]) {
+  if (meshes.every(m => m.metadata?.diffuseTexture)) return;
+  try {
+    const buffer = (await (await fetch(resolveUrlToDataFolder(filePath))).arrayBuffer()) as ArrayBuffer;
+    const view = new DataView(buffer);
+    const jsonLength = view.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, jsonLength)));
+    if (!json.images?.length || json.textures?.length) return;
+    const binStart = 20 + jsonLength + 8;
+    const textures = json.images.map((image: { bufferView?: number; mimeType?: string; name?: string }, i: number) => {
+      let url: string;
+      if (image.bufferView === undefined) {
+        // Imagem sem dados (a conversão original não achou a textura): usa o arquivo
+        // convertido à parte com o mesmo nome (ex.: Skill/unicon.webp, fora do Git).
+        url = resolveUrlToDataFolder(`${image.name ?? ''}.webp`);
+      } else {
+        const bv = json.bufferViews[image.bufferView];
+        const bytes = new Uint8Array(buffer, binStart + (bv.byteOffset ?? 0), bv.byteLength);
+        url = URL.createObjectURL(new Blob([bytes], { type: image.mimeType ?? 'image/webp' }));
+      }
+      const texture = new Texture(url, scene, false, false, Texture.NEAREST_NEAREST);
+      texture.name = `${filePath}#${i}`;
+      texture.hasAlpha = true;
+      return texture;
+    });
+    meshes.forEach((mesh, i) => {
+      if (mesh.metadata?.diffuseTexture) return;
+      const texture = textures[Math.min(i, textures.length - 1)];
+      mesh.metadata ??= {};
+      mesh.metadata.diffuseTexture = texture;
+      // Sem textura no arquivo, a parte ficou com o material padrão do .glb (branco):
+      // troca pelo material do jogo, que desenha a textura guardada em metadata.
+      mesh.material = getMaterial(scene, false, 0, BlendState.ALPHA_DISABLE);
+    });
+  } catch (e) {
+    console.warn(`não foi possível ler as imagens de ${filePath}`, e);
+  }
+}

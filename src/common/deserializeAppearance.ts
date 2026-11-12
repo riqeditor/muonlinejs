@@ -139,8 +139,29 @@ export function deserializeAppearance(app: DataView) {
     });
   }
 
+  // thegame: asas (OpenMU AppearanceSerializer.AddWing): byte 5 bits 2-3 = nível da asa
+  // (1 = 1ª asa, 2 = 2ª asa); byte 9 bits 0-2 = tipo. Grupo 12.
+  let wings: Item | null = null;
+  if (app.byteLength >= 10) {
+    const wingLevel = (app.getUint8(5) >> 2) & 0x03;
+    const wingType = app.getUint8(9) & 0x07;
+    if (wingLevel === 1 && wingType >= 1 && wingType <= 3) wings = { group: 12, num: wingType - 1, lvl: 0 };
+    else if (wingLevel === 2 && wingType >= 1 && wingType <= 4) wings = { group: 12, num: wingType + 2, lvl: 0 };
+  }
+
+  // thegame: pet (AppearanceSerializer.AddPet): byte 5 bits 0-1 = 0 Anjo, 1 Imp, 2 Uniria;
+  // 3 = nenhum ou outro (Dinorant tem também o bit 0 do byte 10). Grupo 13.
+  let pet: Item | null = null;
+  if (app.byteLength >= 11) {
+    const petBits = app.getUint8(5) & 0x03;
+    if (petBits < 3) pet = { group: 13, num: petBits, lvl: 0 };
+    else if ((app.getUint8(10) & 0x01) !== 0) pet = { group: 13, num: 3, lvl: 0 };
+  }
+
   return {
     cls,
+    wings,
+    pet,
     leftHand,
     rightHand,
     helm,

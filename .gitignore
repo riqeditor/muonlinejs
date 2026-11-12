@@ -1,3 +1,6 @@
 node_modules/
 dist
 Data/
+
+# thegame: texturas convertidas do cliente original (Data/), nunca versionar.
+public/game-assets/Skill/unicon*.webp

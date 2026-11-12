@@ -97,6 +97,8 @@ export type Entity = Partial<{
     leftHand: Item | null;
     rightHand: Item | null;
     wings: Item | null;
+    /** thegame: pet/montaria do slot 8 (grupo 13: 0 Anjo, 1 Imp, 2 Uniria, 3 Dinorant). */
+    pet?: Item | null;
     charClass: CharacterClassNumber;
     changed: boolean;
   };

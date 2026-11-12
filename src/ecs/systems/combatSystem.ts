@@ -12,6 +12,9 @@ import type { Entity, ISystemFactory, World } from '../world';
 /** Alterna entre os dois golpes (ou as duas mãos) a cada ataque. */
 let attackAlternate = false;
 
+/** thegame: personagem montado (Uniria/Dinorant). */
+const isRiding = (e: Entity) => (e.modelObject as { MountNumber?: number | null } | undefined)?.MountNumber != null;
+
 // thegame: ataque básico do jogador local.
 // Clicar num monstro define o alvo (PlayerControllerSystem). Este sistema anda até
 // ficar perto, vira para o alvo e envia C1 11 HitRequest a cada ATTACK_INTERVAL,
@@ -130,7 +133,7 @@ export const CombatSystem: ISystemFactory = world => {
     {
       const kind = getWeaponKind(player.charAppearance?.leftHand ?? null, player.charAppearance?.rightHand ?? null);
       attackAlternate = !attackAlternate;
-      player.playerAnimation.action = getSkillAction(kind, attackAlternate, kind === 'staff');
+      player.playerAnimation.action = getSkillAction(kind, attackAlternate, kind === 'staff', isRiding(player));
     }
     player.playerAnimation.lockedUntil =
       world.gameTime.TotalGameTime.TotalSeconds + ATTACK_ANIMATION_TIME;
@@ -204,7 +207,8 @@ export const CombatSystem: ISystemFactory = world => {
       attackAlternate = !attackAlternate;
       player.playerAnimation.action = getAttackAction(
         getWeaponKind(player.charAppearance?.leftHand ?? null, player.charAppearance?.rightHand ?? null),
-        attackAlternate
+        attackAlternate,
+        isRiding(player)
       );
       player.playerAnimation.lockedUntil =
         world.gameTime.TotalGameTime.TotalSeconds + ATTACK_ANIMATION_TIME;

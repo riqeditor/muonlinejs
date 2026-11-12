@@ -66,7 +66,7 @@ export class ModelObject {
   /** thegame: true quando a arma deve ficar nas costas (personagem na safezone). */
   OnBack = false;
   private _linkMode: 'hand' | 'back' | '' = '';
-  private _node: TransformNode;
+  protected _node: TransformNode;
   gltf: {
     mesh: AbstractMesh;
     skeleton: Skeleton;

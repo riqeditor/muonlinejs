@@ -5,12 +5,19 @@ import {
   type TransformNode,
 } from '../libs/babylon/exports';
 import { ModelObject } from './modelObject';
+import type { IVector3Like } from '../libs/babylon/exports';
 import { PlayerClass } from './types';
 import { Entity, World } from '../ecs/world';
 import { PlayerAction } from './objects/enum';
 import { TWFlags } from './terrain/consts';
-import { applyAdditiveToEffectMeshes, loadGLTF } from './modelLoader';
+import { applyAdditiveToEffectMeshes, attachLooseGlbImages, loadGLTF } from './modelLoader';
 import { Store } from '../store';
+
+/**
+ * Ajuste extra da altura do corpo sobre a montaria. Fica em 0: as animações de montado
+ * (PLAYER_STOP_RIDE etc.) já levantam o corpo até a sela (quadril ~1,4 acima do chão).
+ */
+const MOUNT_RIDE_HEIGHT = 0;
 
 export class PlayerObject extends ModelObject {
   playerClass: PlayerClass = PlayerClass.DarkKnight;
@@ -24,6 +31,11 @@ export class PlayerObject extends ModelObject {
   readonly Weapon1: ModelObject;
   readonly Weapon2: ModelObject;
   readonly Wings: ModelObject;
+  /** thegame: montaria (Uniria / Dinorant), presa à posição do personagem, no chão. */
+  readonly Mount: ModelObject;
+  /** Número do pet montado (13/2 Uniria, 13/3 Dinorant) ou null. */
+  MountNumber: number | null = null;
+  private _mountLoading: number | null = null;
 
   IsInteractable = false;
 
@@ -46,6 +58,8 @@ export class PlayerObject extends ModelObject {
     this.Weapon1 = new ModelObject(scene, this._node);
     this.Weapon2 = new ModelObject(scene, this._node);
     this.Wings = new ModelObject(scene, this._node);
+    this.Mount = new ModelObject(scene, parent);
+    this.Mount.NodeNamePrefix = 'Mount_';
 
     this.HelmMask.NodeNamePrefix = 'HelmMask_';
     this.Helm.NodeNamePrefix = 'Helm_';
@@ -282,6 +296,50 @@ export class PlayerObject extends ModelObject {
     if (part === this.Weapon1 || part === this.Weapon2 || part === this.Wings) {
       await applyAdditiveToEffectMeshes(Store.world!.scene, meshes);
     }
+  }
+
+  /** thegame: monta (13/2 Uniria, 13/3 Dinorant) ou desmonta (null). */
+  async setMountAsync(petNumber: number | null) {
+    const model = petNumber === 2 ? 'Rider01.glb' : petNumber === 3 ? 'Rider02.glb' : null;
+    const wanted = model ? petNumber : null;
+    if (wanted !== null && wanted === this._mountLoading) return; // já está carregando esta
+    if (wanted === this.MountNumber && this._mountLoading === null) return; // nada mudou
+
+    if (!model) {
+      this.MountNumber = null;
+      this._mountLoading = null;
+      this.Mount.gltf?.mesh.setEnabled(false);
+      return;
+    }
+
+    this._mountLoading = wanted;
+    const gltf = await loadGLTF('Skill/' + model, Store.world!);
+    if (this._mountLoading !== wanted) return; // trocou de novo enquanto carregava
+    this.Mount.load(gltf);
+    await attachLooseGlbImages(Store.world!.scene, 'Skill/' + model, gltf.mesh.getChildMeshes());
+    gltf.mesh.setEnabled(true);
+    gltf.mesh.isPickable = this.IsInteractable;
+    gltf.mesh.getChildMeshes().forEach(m => (m.isPickable = this.IsInteractable));
+    this.Mount.AnimationSpeed = 6;
+    this.Mount.CurrentAction = -1;
+    this.Mount.playAction(0);
+    this.MountNumber = wanted;
+    this._mountLoading = null;
+  }
+
+  /** thegame: montado, o corpo sobe e a montaria acompanha a posição/rotação no chão. */
+  updateLocation(pos: IVector3Like, scale: number, angles: IVector3Like) {
+    const mounted = this.MountNumber !== null;
+    super.updateLocation(mounted ? { x: pos.x, y: pos.y + MOUNT_RIDE_HEIGHT, z: pos.z } : pos, scale, angles);
+    if (mounted) this.Mount.updateLocation(pos, scale, angles);
+  }
+
+  /** Animação da montaria: parada ou andando. */
+  setMountMoving(moving: boolean) {
+    if (this.MountNumber === null || !this.Mount.gltf) return;
+    const groups = this.Mount.gltf.animationGroups.length;
+    const action = moving && groups > 1 ? 1 : 0;
+    this.Mount.playAction(action);
   }
 
   Update(gameTime: World['gameTime']): void {

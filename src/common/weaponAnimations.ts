@@ -29,7 +29,23 @@ export function getWeaponKind(main: Item | null, off: Item | null): WeaponKind {
 }
 
 /** Ataque normal. `alternate` alterna entre os dois golpes (ou as duas mãos). */
-export function getAttackAction(kind: WeaponKind, alternate: boolean): PlayerAction {
+export function getAttackAction(kind: WeaponKind, alternate: boolean, riding = false): PlayerAction {
+  if (riding) {
+    switch (kind) {
+      case 'spear':
+        return PlayerAction.PLAYER_ATTACK_RIDE_SPEAR;
+      case 'scythe':
+        return PlayerAction.PLAYER_ATTACK_RIDE_SCYTHE;
+      case 'bow':
+        return PlayerAction.PLAYER_ATTACK_RIDE_BOW;
+      case 'crossbow':
+        return PlayerAction.PLAYER_ATTACK_RIDE_CROSSBOW;
+      case 'none':
+        break;
+      default:
+        return PlayerAction.PLAYER_ATTACK_RIDE_SWORD;
+    }
+  }
   switch (kind) {
     case 'sword':
     case 'staff':
@@ -50,10 +66,10 @@ export function getAttackAction(kind: WeaponKind, alternate: boolean): PlayerAct
 }
 
 /** Animação ao usar uma habilidade: magia com as mãos, arco atira, armas golpeiam. */
-export function getSkillAction(kind: WeaponKind, alternate: boolean, isMagic: boolean): PlayerAction {
-  if (kind === 'bow' || kind === 'crossbow') return getAttackAction(kind, alternate);
+export function getSkillAction(kind: WeaponKind, alternate: boolean, isMagic: boolean, riding = false): PlayerAction {
+  if (kind === 'bow' || kind === 'crossbow') return getAttackAction(kind, alternate, riding);
   if (isMagic || kind === 'none') return alternate ? PlayerAction.PLAYER_SKILL_HAND2 : PlayerAction.PLAYER_SKILL_HAND1;
-  return getAttackAction(kind, alternate);
+  return getAttackAction(kind, alternate, riding);
 }
 
 /** Pose parada e andar com a arma na mão (fora da safezone). `null` = usar a normal. */

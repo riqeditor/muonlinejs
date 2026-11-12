@@ -27,7 +27,8 @@ export const AnimationSystem: ISystemFactory = world => {
   function calculateAnimation(
     attributeSystem: MUAttributeSystem,
     velocity: IVector2Like,
-    appearance?: { leftHand: Item | null; rightHand: Item | null }
+    appearance?: { leftHand: Item | null; rightHand: Item | null },
+    riding = false
   ) {
     const inSafeZone = attributeSystem.isAboveZero('inSafeZone');
     const isFemale = attributeSystem.isAboveZero('isFemale');
@@ -35,6 +36,13 @@ export const AnimationSystem: ISystemFactory = world => {
     const isSwimming = attributeSystem.isAboveZero('isSwimming');
     const isSpearEquipped = attributeSystem.isAboveZero('isSpearEquipped');
     const isMoving = velocity.x !== 0 || velocity.y !== 0;
+
+    // thegame: montado na Uniria/Dinorant (com ou sem arma na mão).
+    if (riding) {
+      const armed = !!appearance && getWeaponKind(appearance.leftHand, appearance.rightHand) !== 'none' && !inSafeZone;
+      if (isMoving) return armed ? PlayerAction.PLAYER_RUN_RIDE_WEAPON : PlayerAction.PLAYER_RUN_RIDE;
+      return armed ? PlayerAction.PLAYER_STOP_RIDE_WEAPON : PlayerAction.PLAYER_STOP_RIDE;
+    }
 
     //
     // Female player animations
@@ -145,10 +153,17 @@ export const AnimationSystem: ISystemFactory = world => {
           continue;
         }
         playerAnimation.lockedUntil = undefined;
+        const riding = (entity.modelObject as PlayerObject).MountNumber != null;
+        if (riding) {
+          (entity.modelObject as PlayerObject).setMountMoving(
+            movement.velocity.x !== 0 || movement.velocity.y !== 0
+          );
+        }
         playerAnimation.action = calculateAnimation(
           attributeSystem,
           movement.velocity,
-          entity.charAppearance
+          entity.charAppearance,
+          riding
         );
       }
 

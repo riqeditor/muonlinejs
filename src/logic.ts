@@ -414,6 +414,8 @@ EventBus.on('AddCharactersToScope', packet => {
     cApp.pants = appearance.pants;
     cApp.gloves = appearance.gloves;
     cApp.boots = appearance.boots;
+    cApp.wings = appearance.wings;
+    cApp.pet = appearance.pet;
 
     Object.values(cApp).forEach(item => {
       if (typeof item !== 'object' || item === null) return;
@@ -641,7 +643,8 @@ EventBus.on('ObjectAnimation', packet => {
     if (action === PlayerAction.PLAYER_ATTACK_FIST) {
       action = getAttackAction(
         getWeaponKind(obj.charAppearance?.leftHand ?? null, obj.charAppearance?.rightHand ?? null),
-        clientActionToPlay === ServerPlayerActionType.Attack2
+        clientActionToPlay === ServerPlayerActionType.Attack2,
+        (obj.modelObject as { MountNumber?: number | null } | undefined)?.MountNumber != null
       );
     }
     if (action !== undefined) {

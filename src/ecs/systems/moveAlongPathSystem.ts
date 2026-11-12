@@ -20,13 +20,8 @@ export const MoveAlongPathSystem: ISystemFactory = world => {
 
   return {
     update: (deltaTime: number) => {
-      for (const {
-        pathfinding,
-        transform,
-        movement,
-        localPlayer,
-        attributeSystem,
-      } of query) {
+      for (const entity of query) {
+        const { pathfinding, transform, movement, localPlayer, attributeSystem } = entity;
         if (localPlayer) {
           Store.playerData.setPosition(~~transform.pos.x, ~~transform.pos.z);
 
@@ -37,7 +32,11 @@ export const MoveAlongPathSystem: ISystemFactory = world => {
           Store.playerData.setTileFlag(flag);
         }
 
-        const speed = attributeSystem?.getValue('totalMovementSpeed') ?? 4;
+        // thegame: montado (Uniria/Dinorant) e fora da safezone anda 25% mais rápido, igual ao
+        // servidor (OpenMU: velocidade 15 em vez de 12; na safezone todos andam a 12).
+        const mounted = (entity.modelObject as { MountNumber?: number | null } | undefined)?.MountNumber != null;
+        const inSafe = attributeSystem?.isAboveZero('inSafeZone') ?? false;
+        const speed = (attributeSystem?.getValue('totalMovementSpeed') ?? 4) * (mounted && !inSafe ? 15 / 12 : 1);
         let deltaSpeed = speed * deltaTime;
 
         if (

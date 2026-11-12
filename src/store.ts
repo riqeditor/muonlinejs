@@ -552,6 +552,7 @@ export const Store = new (class _Store {
     playerEntity.charAppearance.leftHand = playerData.leftHandSlot || null;
     playerEntity.charAppearance.rightHand = playerData.rightHandSlot || null;
     playerEntity.charAppearance.wings = playerData.wingsSlot || null;
+    playerEntity.charAppearance.pet = playerData.petSlot || null;
     playerEntity.charAppearance.changed = true;
   }
 
