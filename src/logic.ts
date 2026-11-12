@@ -671,16 +671,22 @@ function findNetObject(netId: number) {
   return Store.world?.netObjsQuery.entities.find(e => e.netId === netId && !e.objOutOfScope);
 }
 
+// thegame: cores do dano como no MU 0.97d (pedido do Riq). O servidor (OpenMU) calcula o
+// golpe e manda o tipo dele; o cliente só pinta o número:
+//   normal = amarelo; crítico (itens com luck) = azul; excelente = verde-água;
+//   ignore (ignora a defesa, opção de asa) = ciano claro; refletido = rosa escuro; veneno = verde.
+// Dano que o PRÓPRIO jogador recebe aparece em vermelho.
 const DAMAGE_COLORS: Record<number, string> = {
-  [ObjectHitDamageKindEnum.NormalRed]: '#ff4a3d',
-  [ObjectHitDamageKindEnum.IgnoreDefenseCyan]: '#3de8ff',
-  [ObjectHitDamageKindEnum.ExcellentLightGreen]: '#7dff6b',
-  [ObjectHitDamageKindEnum.CriticalBlue]: '#4d8dff',
+  [ObjectHitDamageKindEnum.NormalRed]: '#ffc21a',
+  [ObjectHitDamageKindEnum.IgnoreDefenseCyan]: '#7df3ff',
+  [ObjectHitDamageKindEnum.ExcellentLightGreen]: '#2ee6a8',
+  [ObjectHitDamageKindEnum.CriticalBlue]: '#3f7bff',
   [ObjectHitDamageKindEnum.LightPink]: '#ff9ad5',
   [ObjectHitDamageKindEnum.PoisonDarkGreen]: '#2fa84f',
   [ObjectHitDamageKindEnum.ReflectedDarkPink]: '#d1458f',
   [ObjectHitDamageKindEnum.White]: '#ffffff',
 };
+const DAMAGE_TAKEN_COLOR = '#ff4a3d';
 
 // thegame: C1 11 ObjectHit. Alguém (o jogador local, outro jogador ou um monstro) levou dano:
 // mostra o número sobre ele e toca a animação de golpe. A vida do jogador local é
@@ -692,7 +698,13 @@ EventBus.on('ObjectHit', packet => {
 
   const multiplier = p.IsTripleDamage ? ' x3' : p.IsDoubleDamage ? ' x2' : '';
   const text = total > 0 ? `${total}${multiplier}` : 'MISS';
-  const color = total > 0 ? DAMAGE_COLORS[p.Kind] ?? '#ff4a3d' : '#d0d0d0';
+  const hitLocalPlayer = id === Store.playerId;
+  const color =
+    total <= 0
+      ? '#d0d0d0'
+      : hitLocalPlayer && p.Kind === ObjectHitDamageKindEnum.NormalRed
+        ? DAMAGE_TAKEN_COLOR
+        : DAMAGE_COLORS[p.Kind] ?? DAMAGE_COLORS[ObjectHitDamageKindEnum.NormalRed];
   runInAction(() => Store.addDamagePopup(id, text, color));
 
   const obj = findNetObject(id);
