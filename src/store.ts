@@ -454,6 +454,10 @@ export const Store = new (class _Store {
       world: observable,
       characterInfoEnabled: observable,
       npcWindow: observable,
+      partyMembers: observable,
+      partyInvite: observable,
+      partyWindowOpen: observable,
+      answerPartyInvite: action,
       vaultMoney: observable,
       shopItems: observable,
       pendingSellSlot: observable,
@@ -908,6 +912,48 @@ export const Store = new (class _Store {
     this.sendToGS(view);
   }
 
+  // ---------- thegame: party ----------
+
+  /** Membros da party (C1 42 PartyList). Vazio = sem party. */
+  partyMembers: { name: string; index: number; map: number; x: number; y: number; hp: number; maxHp: number }[] = [];
+  /** Convite recebido aguardando resposta (C1 40 PartyRequest). */
+  partyInvite: { requesterId: number; name: string } | null = null;
+  /** Janela da party (tecla P). */
+  partyWindowOpen = false;
+
+  /** C1 40 PartyInviteRequest. */
+  invitePlayerToParty(playerId: number): void {
+    const bytes = new Uint8Array([0xc1, 5, 0x40, (playerId >> 8) & 0xff, playerId & 0xff]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 41 PartyInviteResponse [aceitou, id de quem convidou]. */
+  answerPartyInvite(accept: boolean): void {
+    const invite = this.partyInvite;
+    this.partyInvite = null;
+    if (!invite) return;
+    const id = invite.requesterId;
+    const bytes = new Uint8Array([0xc1, 6, 0x41, accept ? 1 : 0, (id >> 8) & 0xff, id & 0xff]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 43 PartyPlayerKickRequest [índice]. Com o próprio índice = sair da party. */
+  kickPartyMember(index: number): void {
+    const bytes = new Uint8Array([0xc1, 4, 0x43, index]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  leaveParty(): void {
+    const me = this.partyMembers.find(m => m.name === this.characterName);
+    if (me) this.kickPartyMember(me.index);
+  }
+
+  /** C1 42 PartyListRequest. */
+  requestPartyList(): void {
+    const bytes = new Uint8Array([0xc1, 3, 0x42]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
   /** C3 26 ConsumeItemRequest: usa o item do slot (poção, antídoto…). */
   consumeItem(slot: number): void {
     if (!this.playerData.items[slot]) return;
@@ -984,6 +1030,24 @@ export const Store = new (class _Store {
 
     if (/^\/w(\s|$)/i.test(text)) {
       this.addChatMessage('system', 'Para sussurrar use: /w Nome mensagem');
+      return;
+    }
+
+    // thegame: /party Nome convida um jogador que está por perto.
+    const party = /^\/party(?:\s+(\S+))?$/i.exec(text);
+    if (party) {
+      const name = party[1];
+      const target = name
+        ? this.world?.netObjsQuery.entities.find(
+            e => e.playerAnimation && !e.objOutOfScope && e.objectNameInWorld?.toLowerCase() === name.toLowerCase()
+          )
+        : undefined;
+      if (!name) this.addChatMessage('system', 'Para convidar use: /party Nome (ou a janela da party, tecla P)');
+      else if (!target || target.netId === undefined) this.addChatMessage('system', `${name} não está por perto.`);
+      else {
+        this.invitePlayerToParty(target.netId);
+        this.addChatMessage('system', `Convite de party enviado para ${target.objectNameInWorld}.`);
+      }
       return;
     }
 

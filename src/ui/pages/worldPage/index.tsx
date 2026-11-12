@@ -11,6 +11,7 @@ import { EscMenu } from './components/escMenu';
 import { CombatOverlay } from './components/combatOverlay';
 import { MiniMap } from './components/miniMap';
 import { NpcShop } from './components/npcShop';
+import { Party } from './components/party';
 
 const HUD = observer(() => {
   return (
@@ -23,6 +24,7 @@ const HUD = observer(() => {
       </div>
       <MapsList />
       <MiniMap />
+      <Party />
       <ChatBox />
     </div>
   );

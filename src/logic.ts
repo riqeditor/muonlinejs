@@ -1278,6 +1278,75 @@ EventBus.on('unknownPacket', ({ code, packet }) => {
   }
 });
 
+// ---------- thegame: party ----------
+
+/** Nome de quem tem esse id (jogadores em volta). */
+function playerNameById(id: number): string {
+  const e = Store.world?.netObjsQuery.entities.find(x => x.netId === id && !x.objOutOfScope);
+  return e?.objectNameInWorld ?? `jogador ${id}`;
+}
+
+// C1 40 PartyRequest: alguém convidou você.
+EventBus.on('PartyRequest', packet => {
+  if (packet.byteLength < 5) return;
+  const requesterId = packet.getUint16(3, false) & 0x7fff;
+  runInAction(() => (Store.partyInvite = { requesterId, name: playerNameById(requesterId) }));
+});
+
+// C1 42 PartyList: [C1, len, 42, 01, quantidade, membros de 24 bytes: nome(10), índice, mapa,
+// x, y, -, -, vida LE32, vida máxima LE32].
+EventBus.on('PartyList', packet => {
+  if (packet.byteLength < 5) return;
+  const count = packet.getUint8(4);
+  const members: typeof Store.partyMembers = [];
+  for (let i = 0; i < count; i++) {
+    const o = 5 + i * 24;
+    if (o + 24 > packet.byteLength) break;
+    const name = decodeUtf8(packet, o, o + 10).replace(/ .*$/s, '').trim();
+    members.push({
+      name,
+      index: packet.getUint8(o + 10),
+      map: packet.getUint8(o + 11),
+      x: packet.getUint8(o + 12),
+      y: packet.getUint8(o + 13),
+      hp: packet.getUint32(o + 16, true),
+      maxHp: packet.getUint32(o + 20, true),
+    });
+  }
+  runInAction(() => (Store.partyMembers = members.length > 1 ? members : []));
+});
+
+// C1 43 RemovePartyMember [índice]: alguém saiu (ou você). O servidor manda a lista nova
+// em seguida; se a party acabou, limpa.
+EventBus.on('RemovePartyMember', packet => {
+  if (packet.byteLength < 4) return;
+  const index = packet.getUint8(3);
+  runInAction(() => {
+    const me = Store.partyMembers.find(m => m.name === Store.characterName);
+    const rest = Store.partyMembers.filter(m => m.index !== index);
+    Store.partyMembers = !me || me.index === index || rest.length <= 1 ? [] : rest;
+  });
+});
+
+// C1 44 PartyHealthUpdate [quantidade, (índice << 4 | vida em décimos)].
+EventBus.on('PartyHealthUpdate', packet => {
+  if (packet.byteLength < 4) return;
+  const count = packet.getUint8(3);
+  runInAction(() => {
+    for (let i = 0; i < count && 4 + i < packet.byteLength; i++) {
+      const b = packet.getUint8(4 + i);
+      const member = Store.partyMembers.find(m => m.index === b >> 4);
+      if (!member || member.maxHp <= 0) continue;
+      // O servidor manda só décimos (0–10). Mantém o número exato da lista enquanto ele
+      // ainda estiver na mesma faixa; senão, usa a aproximação.
+      const tenths = b & 0x0f;
+      if (Math.floor((member.hp * 10) / member.maxHp) !== tenths) {
+        member.hp = Math.round((member.maxHp * tenths) / 10);
+      }
+    }
+  });
+});
+
 // thegame: C1 2A ItemDurabilityChanged — ex.: poção usada (a quantidade é a "durabilidade").
 EventBus.on('ItemDurabilityChanged', packet => {
   if (packet.byteLength < 5) return;
