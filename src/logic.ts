@@ -1124,6 +1124,32 @@ EventBus.on('ItemDropResponse', packet => {
   Store.syncPlayerAppearance();
 });
 
+// thegame: C1 F3 06 CharacterStatIncreaseResponse. Byte 4: bit 0x10 = sucesso, 4 bits baixos =
+// atributo (0 força, 1 agilidade, 2 vitalidade, 3 energia). Bytes 6-7: novo máximo de vida
+// (vitalidade) ou de mana (energia).
+EventBus.on('CharacterStatIncreaseResponse', packet => {
+  if (packet.byteLength < 5) return;
+  const flags = packet.getUint8(4);
+  const success = (flags & 0x10) !== 0;
+  const attr = flags & 0x0f;
+  const dependentMax = packet.byteLength >= 8 ? packet.getUint16(6, true) : 0;
+  runInAction(() => {
+    Store.pendingStatPoints = Math.max(0, Store.pendingStatPoints - 1);
+    if (!success) return;
+    const pd = Store.playerData;
+    pd.points = Math.max(0, pd.points - 1);
+    if (attr === 0) pd.str += 1;
+    else if (attr === 1) pd.agi += 1;
+    else if (attr === 2) {
+      pd.sta += 1;
+      if (dependentMax > 0) pd.maxHP = dependentMax;
+    } else if (attr === 3) {
+      pd.eng += 1;
+      if (dependentMax > 0) pd.maxMP = dependentMax;
+    }
+  });
+});
+
 // thegame: C1 2A ItemDurabilityChanged — ex.: poção usada (a quantidade é a "durabilidade").
 EventBus.on('ItemDurabilityChanged', packet => {
   if (packet.byteLength < 5) return;

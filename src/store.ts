@@ -799,6 +799,22 @@ export const Store = new (class _Store {
     this.sendToGS(new DataView(bytes.buffer));
   }
 
+  /**
+   * C1 F3 06 IncreaseCharacterStatPoint: usa pontos livres num atributo (0 força, 1 agilidade,
+   * 2 vitalidade, 3 energia). Manda um pedido por ponto; o servidor confirma cada um.
+   */
+  increaseStat(attr: number, amount = 1): void {
+    const count = Math.min(amount, this.playerData.points - this.pendingStatPoints);
+    for (let i = 0; i < count; i++) {
+      const bytes = new Uint8Array([0xc1, 5, 0xf3, 0x06, attr]);
+      this.sendToGS(new DataView(bytes.buffer));
+    }
+    if (count > 0) this.pendingStatPoints += count;
+  }
+
+  /** Pontos pedidos ao servidor e ainda não confirmados (evita gastar além dos livres). */
+  pendingStatPoints = 0;
+
   /** C3 26 ConsumeItemRequest: usa o item do slot (poção, antídoto…). */
   consumeItem(slot: number): void {
     if (!this.playerData.items[slot]) return;

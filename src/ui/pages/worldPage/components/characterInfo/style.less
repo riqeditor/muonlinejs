@@ -1,89 +1,126 @@
+// thegame: ficha do personagem no tema 0.97d (pedra escura, moldura dourada).
 .character-info {
-  background-color: #333;
   pointer-events: auto;
-  padding: 8px 12px;
+  height: 100%;
+  width: 250px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  border: 2px solid #000;
-  color: #fff;
-  font-size: 14px;
-  height: 100%;
-
-  @yellow-color: #ff0;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-family: Georgia, serif;
+  color: #e8dcc0;
+  background: linear-gradient(180deg, rgba(34, 29, 22, 0.97), rgba(14, 12, 9, 0.97));
+  border: 1px solid #7a6237;
+  outline: 1px solid #000;
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.6), inset 0 0 0 4px rgba(201, 154, 62, 0.35),
+    -4px 0 18px rgba(0, 0, 0, 0.7);
+  user-select: none;
 
   .nickname {
-    font-size: 16px;
+    font-size: 17px;
     font-weight: bold;
     text-align: center;
-    color: #0ff;
-  }
-
-  .level {
-    color: @yellow-color;
-  }
-
-  .level-points {
-    display: flex;
-    justify-content: space-between;
+    letter-spacing: 0.04em;
+    color: #f1d58f;
+    text-shadow: 0 1px 2px #000;
   }
 
   .status {
+    margin-top: -8px;
     font-size: 12px;
     text-align: center;
-    color: #fff;
+    color: #c9a45a;
+  }
+
+  .info-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid #3a3020;
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+
+      span {
+        color: #b9ad92;
+      }
+
+      b {
+        color: #fff3c8;
+        font-weight: normal;
+      }
+
+      &.has-points b {
+        color: #7dff6b;
+        font-weight: bold;
+      }
+    }
   }
 
   .stats {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
 
     .stat {
       display: flex;
       align-items: center;
-      border-radius: 8px;
-      background-color: #626262;
-      gap: 8px;
+      gap: 6px;
+      padding: 3px 4px 3px 8px;
+      border: 1px solid #4a3c22;
+      border-radius: 2px;
+      background: linear-gradient(180deg, #2a241a, #15120d);
 
       .label {
-        width: 6ch;
-        text-align: center;
-        color: @yellow-color;
+        flex: 1;
+        color: #f1d58f;
       }
 
       .value {
-        width: 10ch;
-        text-align: center;
-        color: @yellow-color;
-        background-color: #000;
-        border-radius: 4px;
+        min-width: 7ch;
+        padding: 1px 6px;
+        text-align: right;
+        color: #fff;
+        background: #000;
+        border: 1px solid #2a241a;
+      }
+
+      .add-point {
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        font-size: 15px;
+        font-weight: bold;
+        line-height: 1;
+        color: #f1d58f;
+        background: linear-gradient(180deg, #4a4438, #1a1712);
+        border: 1px solid #8a7140;
+        border-radius: 2px;
+        cursor: pointer;
+
+        &:hover:not(:disabled) {
+          color: #fff3c8;
+          border-color: #d8b25a;
+        }
+
+        &:disabled {
+          opacity: 0.3;
+          cursor: default;
+        }
       }
     }
   }
 
-  .attribute-value {
-    font-size: 12px;
-  }
-}
-
-// thegame: tema 0.97d (pedra escura, moldura dourada) por cima do estilo base.
-.character-info {
-  background: linear-gradient(180deg, rgba(34, 29, 22, 0.97), rgba(14, 12, 9, 0.97));
-  border: 1px solid #7a6237;
-  outline: 1px solid #000;
-  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.6), inset 0 0 0 4px rgba(201, 154, 62, 0.35), -4px 0 18px rgba(0, 0, 0, 0.7);
-  color: #e8dcc0;
-
-  .nickname {
-    font-family: Georgia, serif;
-    color: #f1d58f;
-    text-shadow: 0 1px 2px #000;
-  }
-
-  .stats .stat {
-    border-radius: 2px;
-    border: 1px solid #4a3c22;
-    background: linear-gradient(180deg, #2a241a, #15120d);
+  .hint {
+    margin-top: auto;
+    font-size: 11px;
+    text-align: center;
+    color: #8a8070;
   }
 }

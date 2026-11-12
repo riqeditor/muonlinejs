@@ -1,49 +1,35 @@
-import { useEventBus } from '../../../../../hooks/useEventBus';
-import { Store } from '../../../../../store';
 import './style.less';
 import { observer } from 'mobx-react-lite';
+import { runInAction } from 'mobx';
+import { Store } from '../../../../../store';
+import { useEventBus } from '../../../../../hooks/useEventBus';
 
-const Stat = ({
-  label,
-  value,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  onClick: () => void;
-}) => {
-  return (
-    <div className="stat">
-      <span className="label">{label}</span>
-      <span className="value">{value}</span>
-      <button className="add-point" onClick={onClick}>
-        +
-      </button>
-    </div>
-  );
-};
+// thegame: ficha do personagem (tecla C) com os dados reais do servidor e distribuição de
+// pontos. Clique = +1, Shift+clique = +10, Ctrl+clique = +100 (limitado aos pontos livres).
+// Cada ponto é um C1 F3 06 IncreaseCharacterStatPoint; o servidor confirma um por um.
 
-const AttributeValue = ({ text }: { text: string }) => {
-  return <span className="attribute-value">{text}</span>;
-};
+const HOT_KEY = 'KeyC';
 
-const HOT_KEY = `KeyC`;
+/** Número do atributo no protocolo (OpenMU CharacterStatAttribute). */
+const STATS = [
+  { attr: 0, label: 'Força', key: 'str' },
+  { attr: 1, label: 'Agilidade', key: 'agi' },
+  { attr: 2, label: 'Vitalidade', key: 'sta' },
+  { attr: 3, label: 'Energia', key: 'eng' },
+] as const;
+
+function amountFor(e: React.MouseEvent): number {
+  if (e.ctrlKey) return 100;
+  if (e.shiftKey) return 10;
+  return 1;
+}
 
 export const CharacterInfo = observer(() => {
   const playerData = Store.playerData;
 
-  const dmg = `Dmg(rate): 6~14(48)`;
-  const attackRate = `Attack rate: 96`;
-  const defense = `Defense(rate): 51(6+0)`;
-  const attackSpeed = `Attack speed: 29`;
-  const defenceRate = `Defense rate: 14`;
-  const hp = `HP: ${playerData.currentHP} / ${playerData.maxHP}`;
-  const mp = `Mana: ${playerData.currentMP} / ${playerData.maxMP}`;
-  const skillDamage = `Skill Damage: 201%`;
-
   useEventBus('keyPressed', key => {
     if (key === HOT_KEY) {
-      Store.characterInfoEnabled = !Store.characterInfoEnabled;
+      runInAction(() => (Store.characterInfoEnabled = !Store.characterInfoEnabled));
     }
   });
 
@@ -51,33 +37,72 @@ export const CharacterInfo = observer(() => {
     return null;
   }
 
+  const free = playerData.points;
+  const expInLevel = Math.max(0, playerData.exp - playerData.currentLvlExp);
+  const expNeeded = Math.max(1, playerData.expToNextLvl - playerData.currentLvlExp);
+
   return (
-    <div className="character-info">
-      <span className="nickname">Test</span>
-      <span className="status">(Dark Knight)</span>
-      <div className="level-points">
-        <span className="level">Level: {playerData.level}</span>
-        {playerData.points > 0 && (
-          <span className="points">Points: {playerData.points}</span>
-        )}
+    <div className="character-info" onPointerDown={e => e.stopPropagation()} onContextMenu={e => e.preventDefault()}>
+      <span className="nickname">{Store.characterName}</span>
+      <span className="status">{Store.characterClassName}</span>
+
+      <div className="info-rows">
+        <div className="row">
+          <span>Nível</span>
+          <b>{playerData.level}</b>
+        </div>
+        <div className="row">
+          <span>Experiência</span>
+          <b>
+            {expInLevel.toLocaleString('pt-BR')} / {expNeeded.toLocaleString('pt-BR')}
+          </b>
+        </div>
+        <div className={`row points${free > 0 ? ' has-points' : ''}`}>
+          <span>Pontos livres</span>
+          <b>{free.toLocaleString('pt-BR')}</b>
+        </div>
       </div>
-      <span className="exp">
-        Exp:{playerData.exp}/{playerData.expToNextLvl}
-      </span>
+
       <div className="stats">
-        <Stat label="STR" value={playerData.str} onClick={() => {}} />
-        <AttributeValue text={dmg} />
-        <AttributeValue text={attackRate} />
-        <Stat label="AGI" value={playerData.agi} onClick={() => {}} />
-        <AttributeValue text={defense} />
-        <AttributeValue text={attackSpeed} />
-        <AttributeValue text={defenceRate} />
-        <Stat label="STA" value={playerData.sta} onClick={() => {}} />
-        <AttributeValue text={hp} />
-        <Stat label="ENG" value={playerData.eng} onClick={() => {}} />
-        <AttributeValue text={mp} />
-        <AttributeValue text={skillDamage} />
+        {STATS.map(stat => (
+          <div className="stat" key={stat.attr}>
+            <span className="label">{stat.label}</span>
+            <span className="value">{playerData[stat.key].toLocaleString('pt-BR')}</span>
+            <button
+              className="add-point"
+              disabled={free <= 0}
+              title="Clique: +1 · Shift+clique: +10 · Ctrl+clique: +100"
+              onClick={e => {
+                e.stopPropagation();
+                Store.increaseStat(stat.attr, amountFor(e));
+              }}
+            >
+              +
+            </button>
+          </div>
+        ))}
       </div>
+
+      <div className="info-rows">
+        <div className="row">
+          <span>Vida</span>
+          <b>
+            {playerData.currentHP} / {playerData.maxHP}
+          </b>
+        </div>
+        <div className="row">
+          <span>Mana</span>
+          <b>
+            {playerData.currentMP} / {playerData.maxMP}
+          </b>
+        </div>
+        <div className="row">
+          <span>Zen</span>
+          <b>{playerData.money.toLocaleString('pt-BR')}</b>
+        </div>
+      </div>
+
+      <span className="hint">Clique no + para usar 1 ponto · Shift: 10 · Ctrl: 100</span>
     </div>
   );
 });
