@@ -9,6 +9,7 @@ import { ChatBox } from './components/chatBox';
 import { MapLoadingOverlay } from './components/mapLoading';
 import { EscMenu } from './components/escMenu';
 import { CombatOverlay } from './components/combatOverlay';
+import { MiniMap } from './components/miniMap';
 
 const HUD = observer(() => {
   return (
@@ -19,6 +20,7 @@ const HUD = observer(() => {
         <CharacterInfo />
       </div>
       <MapsList />
+      <MiniMap />
       <ChatBox />
     </div>
   );

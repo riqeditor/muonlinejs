@@ -27,6 +27,6 @@ for (const [from, to] of TEXTURES) {
       .webp()
       .toBuffer();
   }
-  await Bun.write(`${TARGET}${to}.webp`, webp);
+  await Bun.write(`${TARGET}${to}.webp`, new Uint8Array(webp));
   console.log(`${from} -> ${to}.webp`);
 }
