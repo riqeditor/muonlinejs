@@ -1005,9 +1005,11 @@ function onItemMoveResponse(packet: DataView) {
     }
     runInAction(() => {
       if (storageMove.fromStorage === 2) Store.shopItems[storageMove.fromSlot] = null;
+      else if (storageMove.fromStorage === 1) Store.tradeMyItems[storageMove.fromSlot] = null;
       else Store.playerData.items[storageMove.fromSlot] = null as unknown as Item;
       if (moved) {
         if (storage === 2) Store.shopItems[targetSlot] = moved;
+        else if (storage === 1) Store.tradeMyItems[targetSlot] = moved;
         else Store.playerData.items[targetSlot] = moved;
       }
     });
@@ -1345,6 +1347,80 @@ EventBus.on('PartyHealthUpdate', packet => {
       }
     }
   });
+});
+
+// ---------- thegame: troca entre jogadores ----------
+
+// C3 36 TradeRequest [nome 10]: alguém quer trocar com você.
+EventBus.on('TradeRequest', packet => {
+  if (packet.byteLength < 4) return;
+  const name = decodeUtf8(packet, 3, Math.min(packet.byteLength, 13));
+  runInAction(() => (Store.tradeRequestFrom = name));
+});
+
+// C1 37 TradeRequestAnswer [aceitou, nome 10, nível BE16, guilda]: a troca abriu (ou foi recusada).
+EventBus.on('TradeRequestAnswer', packet => {
+  if (packet.byteLength < 4) return;
+  const accepted = packet.getUint8(3) !== 0;
+  const name = packet.byteLength >= 14 ? decodeUtf8(packet, 4, 14) : '';
+  const level = packet.byteLength >= 16 ? packet.getUint16(14, false) : 0;
+  runInAction(() => {
+    Store.resetTrade();
+    if (accepted) {
+      Store.trade = { partner: name, partnerLevel: level };
+      Store.inventoryEnabled = true;
+    } else {
+      Store.addChatMessage('system', `${name || 'O jogador'} recusou a troca.`);
+    }
+  });
+});
+
+// C1 39 TradeItemAdded [posição, 12 bytes]: o outro colocou um item.
+EventBus.on('TradeItemAdded', packet => {
+  if (packet.byteLength < 4 + 12) return;
+  const slot = packet.getUint8(3);
+  try {
+    const item = ItemSerializer.DeserializeItem(new Uint8Array(packet.buffer, packet.byteOffset + 4, 12).slice());
+    runInAction(() => (Store.tradeTheirItems[slot] = item));
+  } catch (e) {
+    console.warn('item da troca não lido', e);
+  }
+});
+
+// C1 38 TradeItemRemoved [posição]: o outro tirou um item.
+EventBus.on('TradeItemRemoved', packet => {
+  if (packet.byteLength < 4) return;
+  const slot = packet.getUint8(3);
+  runInAction(() => (Store.tradeTheirItems[slot] = null));
+});
+
+// C1 3B TradeMoneyUpdate [-, zen LE32]: o outro mudou o zen.
+EventBus.on('TradeMoneyUpdate', packet => {
+  if (packet.byteLength < 8) return;
+  runInAction(() => (Store.tradeTheirMoney = packet.getUint32(4, true)));
+});
+
+// C1 3D TradeFinished [0 cancelada, 1 sucesso, 2 inventário cheio, 3 tempo, 4 item não negociável].
+EventBus.on('TradeFinished', packet => {
+  const result = packet.byteLength >= 4 ? packet.getUint8(3) : 0;
+  const messages = ['Troca cancelada.', 'Troca concluída!', 'Troca falhou: inventário cheio.', 'Troca cancelada: tempo esgotado.', 'Troca falhou: item que não pode ser trocado.'];
+  runInAction(() => {
+    Store.resetTrade();
+    Store.addChatMessage('system', messages[result] ?? 'Troca encerrada.');
+  });
+});
+
+// C1 3C TradeButtonStateChanged [estado do botão do outro]. Nas definições antigas do cliente
+// este pacote está com o código errado (C3), então chega como desconhecido.
+EventBus.on('unknownPacket', ({ code, packet }) => {
+  if (code === 0x3c && packet.getUint8(0) === 0xc1 && packet.byteLength >= 4) {
+    const state = packet.getUint8(3);
+    runInAction(() => {
+      Store.tradeTheirState = state;
+      // Vermelho = algo mudou na troca: o meu "aceitar" é desmarcado pelo servidor.
+      if (state === 2) Store.tradeMyState = 0;
+    });
+  }
 });
 
 // thegame: C1 2A ItemDurabilityChanged — ex.: poção usada (a quantidade é a "durabilidade").

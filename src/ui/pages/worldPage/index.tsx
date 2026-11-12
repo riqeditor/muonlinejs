@@ -12,6 +12,7 @@ import { CombatOverlay } from './components/combatOverlay';
 import { MiniMap } from './components/miniMap';
 import { NpcShop } from './components/npcShop';
 import { Party } from './components/party';
+import { TradeRequestPopup, TradeWindow } from './components/trade';
 
 const HUD = observer(() => {
   return (
@@ -19,12 +20,14 @@ const HUD = observer(() => {
       <BottomBar />
       <div className="panels-stack">
         <NpcShop />
+        <TradeWindow />
         <Inventory />
         <CharacterInfo />
       </div>
       <MapsList />
       <MiniMap />
       <Party />
+      <TradeRequestPopup />
       <ChatBox />
     </div>
   );

@@ -15,6 +15,8 @@ export const EscMenu = observer(() => {
       if (Store.heldItemSlot !== null) {
         Store.heldItemSlot = null;
         Store.heldItemDragging = false;
+      } else if (Store.trade) {
+        Store.cancelTrade();
       } else if (Store.partyWindowOpen) {
         Store.partyWindowOpen = false;
       } else if (Store.npcWindow !== null) {

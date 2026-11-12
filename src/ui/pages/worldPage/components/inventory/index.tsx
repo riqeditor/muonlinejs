@@ -84,6 +84,14 @@ function onSlotRightClick(slot: number) {
     Store.sellToNpc(slot);
     return;
   }
+  // thegame: com a troca aberta, botão direito na mochila coloca o item na troca (8x4).
+  if (Store.trade && !isEquipmentSlot(slot)) {
+    const item = Store.playerData.items[slot];
+    const target = findFreeGridSlot(item, Store.tradeMyItems, 8, 4);
+    if (target === null) Store.addChatMessage('system', 'Não cabe mais nada na troca.');
+    else Store.moveBetweenStorages(0, slot, 1, target);
+    return;
+  }
   // thegame: com o baú aberto, botão direito na mochila guarda o item no baú.
   if (Store.npcWindow === 2 && !isEquipmentSlot(slot)) {
     const item = Store.playerData.items[slot];
@@ -251,7 +259,9 @@ export const Inventory = observer(() => {
       <BagGrid />
       <div className="zen">Zen: {playerData.money.toLocaleString('pt-BR')}</div>
       <div className="inventory-hint">
-        {Store.npcWindow === 2
+        {Store.trade
+          ? 'Troca aberta: botão direito na mochila coloca o item na troca'
+          : Store.npcWindow === 2
           ? 'Baú aberto: botão direito na mochila guarda o item'
           : isMerchantOpen()
           ? 'Loja aberta: botão direito na mochila vende o item'

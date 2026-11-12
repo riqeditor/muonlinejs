@@ -121,7 +121,7 @@ const PartyWindow = observer(() => {
         </button>
       )}
 
-      {canInvite && (
+      {(
         <>
           <span className="subtitle">Jogadores por perto</span>
           {nearby.length === 0 ? (
@@ -131,16 +131,23 @@ const PartyWindow = observer(() => {
               {nearby.map(e => (
                 <li key={e.netId}>
                   <span>{e.objectNameInWorld}</span>
-                  <button className="mu-button small" onClick={() => Store.invitePlayerToParty(e.netId!)}>
-                    Convidar
-                  </button>
+                  <span className="actions">
+                    <button className="mu-button small" onClick={() => Store.requestTrade(e.netId!)}>
+                      Trocar
+                    </button>
+                    {canInvite && (
+                      <button className="mu-button small" onClick={() => Store.invitePlayerToParty(e.netId!)}>
+                        Convidar
+                      </button>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
           )}
         </>
       )}
-      <span className="hint">Também dá para convidar no chat: /party Nome</span>
+      <span className="hint">No chat: /party Nome (convidar) · /troca Nome (trocar)</span>
     </div>
   );
 });

@@ -454,6 +454,18 @@ export const Store = new (class _Store {
       world: observable,
       characterInfoEnabled: observable,
       npcWindow: observable,
+      tradeRequestFrom: observable,
+      trade: observable,
+      tradeMyItems: observable,
+      tradeTheirItems: observable,
+      tradeMyMoney: observable,
+      tradeTheirMoney: observable,
+      tradeMyState: observable,
+      tradeTheirState: observable,
+      answerTradeRequest: action,
+      setTradeMoney: action,
+      setTradeAccepted: action,
+      resetTrade: action,
       partyMembers: observable,
       partyInvite: observable,
       partyWindowOpen: observable,
@@ -880,7 +892,8 @@ export const Store = new (class _Store {
 
   /** C3 24 ItemMoveRequest entre armazéns (0 inventário, 2 baú). */
   moveBetweenStorages(fromStorage: number, fromSlot: number, toStorage: number, toSlot: number): void {
-    const item = fromStorage === 2 ? this.shopItems[fromSlot] : this.playerData.items[fromSlot];
+    const item =
+      fromStorage === 2 ? this.shopItems[fromSlot] : fromStorage === 1 ? this.tradeMyItems[fromSlot] : this.playerData.items[fromSlot];
     if (!item || this.pendingStorageMove) return;
     const bytes = new Uint8Array(19);
     bytes[0] = 0xc3;
@@ -952,6 +965,70 @@ export const Store = new (class _Store {
   requestPartyList(): void {
     const bytes = new Uint8Array([0xc1, 3, 0x42]);
     this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  // ---------- thegame: troca entre jogadores ----------
+
+  /** Pedido de troca recebido (C3 36), aguardando Aceitar/Recusar. */
+  tradeRequestFrom: string | null = null;
+  /** Troca aberta: nome e nível do outro jogador. */
+  trade: { partner: string; partnerLevel: number } | null = null;
+  /** Itens que eu coloquei (armazém 1, grade 8x4) e os do outro jogador. */
+  tradeMyItems: (Item | null)[] = [];
+  tradeTheirItems: (Item | null)[] = [];
+  tradeMyMoney = 0;
+  tradeTheirMoney = 0;
+  /** Estado do botão de aceitar (0 desmarcado, 1 marcado, 2 vermelho = algo mudou). */
+  tradeMyState = 0;
+  tradeTheirState = 0;
+
+  /** C3 36 TradeRequest: pede troca a um jogador por perto. */
+  requestTrade(playerId: number): void {
+    const bytes = new Uint8Array([0xc3, 5, 0x36, (playerId >> 8) & 0xff, playerId & 0xff]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 37 TradeRequestResponse [aceitou]. */
+  answerTradeRequest(accept: boolean): void {
+    if (this.tradeRequestFrom === null) return;
+    this.tradeRequestFrom = null;
+    const bytes = new Uint8Array([0xc1, 4, 0x37, accept ? 1 : 0]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 3A SetTradeMoney [-, zen LE32]. */
+  setTradeMoney(amount: number): void {
+    const bytes = new Uint8Array(8);
+    const view = new DataView(bytes.buffer);
+    bytes[0] = 0xc1;
+    bytes[1] = 8;
+    bytes[2] = 0x3a;
+    view.setUint32(4, Math.max(0, Math.floor(amount)), true);
+    this.tradeMyMoney = Math.max(0, Math.floor(amount));
+    this.sendToGS(view);
+  }
+
+  /** C1 3C TradeButtonStateChange [0 desmarcado, 1 marcado]. */
+  setTradeAccepted(accepted: boolean): void {
+    this.tradeMyState = accepted ? 1 : 0;
+    const bytes = new Uint8Array([0xc1, 4, 0x3c, accepted ? 1 : 0]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 3D TradeCancel. */
+  cancelTrade(): void {
+    const bytes = new Uint8Array([0xc1, 3, 0x3d]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  resetTrade(): void {
+    this.trade = null;
+    this.tradeMyItems = [];
+    this.tradeTheirItems = [];
+    this.tradeMyMoney = 0;
+    this.tradeTheirMoney = 0;
+    this.tradeMyState = 0;
+    this.tradeTheirState = 0;
   }
 
   /** C3 26 ConsumeItemRequest: usa o item do slot (poção, antídoto…). */
@@ -1030,6 +1107,24 @@ export const Store = new (class _Store {
 
     if (/^\/w(\s|$)/i.test(text)) {
       this.addChatMessage('system', 'Para sussurrar use: /w Nome mensagem');
+      return;
+    }
+
+    // thegame: /troca Nome pede troca a um jogador que está por perto.
+    const tradeCmd = /^\/(?:troca|trade)(?:\s+(\S+))?$/i.exec(text);
+    if (tradeCmd) {
+      const name = tradeCmd[1];
+      const target = name
+        ? this.world?.netObjsQuery.entities.find(
+            e => e.playerAnimation && !e.objOutOfScope && e.objectNameInWorld?.toLowerCase() === name.toLowerCase()
+          )
+        : undefined;
+      if (!name) this.addChatMessage('system', 'Para trocar use: /troca Nome (ou a janela da party, tecla P)');
+      else if (!target || target.netId === undefined) this.addChatMessage('system', `${name} não está por perto.`);
+      else {
+        this.requestTrade(target.netId);
+        this.addChatMessage('system', `Pedido de troca enviado para ${target.objectNameInWorld}.`);
+      }
       return;
     }
 
