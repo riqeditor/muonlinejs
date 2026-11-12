@@ -46,7 +46,8 @@ const VaultMoney = observer(() => {
 export const NpcShop = observer(() => {
   const isShop = Store.npcWindow === 0 || Store.npcWindow === 1;
   const isVault = Store.npcWindow === 2;
-  if (!isShop && !isVault) return null;
+  const isChaos = Store.npcWindow === 3;
+  if (!isShop && !isVault && !isChaos) return null;
 
   const items = Store.shopItems;
 
@@ -59,7 +60,7 @@ export const NpcShop = observer(() => {
     if (!item) return;
     const target = findFreeInventorySlot(item, Store.playerData.items);
     if (target === null) Store.addChatMessage('system', 'Não há espaço livre no inventário.');
-    else Store.moveBetweenStorages(2, slot, 0, target);
+    else Store.moveBetweenStorages(isChaos ? 3 : 2, slot, 0, target);
   };
 
   const cells = [];
@@ -95,16 +96,30 @@ export const NpcShop = observer(() => {
 
   // A loja mostra só as linhas usadas (+2); o baú mostra a grade inteira.
   const lastRow = items.reduce((max, item, slot) => (item ? Math.max(max, Math.floor(slot / COLUMNS)) : max), 0);
-  const rowsShown = isVault ? ROWS : Math.max(6, Math.min(ROWS, lastRow + 3));
+  const rowsShown = isChaos ? 4 : isVault ? ROWS : Math.max(6, Math.min(ROWS, lastRow + 3));
 
   return (
     <div className="npc-shop inventory" onPointerDown={e => e.stopPropagation()} onContextMenu={e => e.preventDefault()}>
-      <span className="title">{isVault ? 'Baú' : 'Loja'}</span>
+      <span className="title">{isChaos ? 'Chaos Machine' : isVault ? 'Baú' : 'Loja'}</span>
       <div className="shop-grid" style={{ gridTemplateRows: `repeat(${rowsShown}, ${isVault ? 26 : 32}px)` }}>
         {cells.slice(0, rowsShown * COLUMNS)}
         {placed}
       </div>
       {isVault && <VaultMoney />}
+      {isChaos && (
+        <div className="chaos-info">
+          {Store.chaosPreview && Store.shopItems.some(Boolean) ? (
+            <span>
+              Chance: <b>{Store.chaosPreview.rate}%</b> · Preço: <b>{Store.chaosPreview.price.toLocaleString('pt-BR')}</b> zen
+            </span>
+          ) : (
+            <span>Coloque os itens da combinação (ex.: item +9 + Joia do Caos + Bless/Soul).</span>
+          )}
+          <button className="mu-button" disabled={!Store.shopItems.some(Boolean)} onClick={() => Store.chaosMix()}>
+            Combinar
+          </button>
+        </div>
+      )}
       <div className="shop-buttons">
         {isShop && (
           <button className="mu-button small" onClick={() => Store.repairItem(0xff)} title="Conserta tudo o que está equipado e na mochila">
@@ -116,7 +131,9 @@ export const NpcShop = observer(() => {
         </button>
       </div>
       <div className="inventory-hint">
-        {isVault
+        {isChaos
+          ? 'Botão direito: devolver para a mochila · na mochila: colocar na Chaos Machine'
+          : isVault
           ? 'Botão direito: trazer para a mochila · na mochila: guardar no baú'
           : 'Botão direito ou duplo clique: comprar · na mochila: vender'}
       </div>

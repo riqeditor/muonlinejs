@@ -1004,11 +1004,11 @@ function onItemMoveResponse(packet: DataView) {
       console.error('Item movido não pôde ser lido', error);
     }
     runInAction(() => {
-      if (storageMove.fromStorage === 2) Store.shopItems[storageMove.fromSlot] = null;
+      if (storageMove.fromStorage === 2 || storageMove.fromStorage === 3) Store.shopItems[storageMove.fromSlot] = null;
       else if (storageMove.fromStorage === 1) Store.tradeMyItems[storageMove.fromSlot] = null;
       else Store.playerData.items[storageMove.fromSlot] = null as unknown as Item;
       if (moved) {
-        if (storage === 2) Store.shopItems[targetSlot] = moved;
+        if (storage === 2 || storage === 3) Store.shopItems[targetSlot] = moved;
         else if (storage === 1) Store.tradeMyItems[targetSlot] = moved;
         else Store.playerData.items[targetSlot] = moved;
       }
@@ -1188,7 +1188,10 @@ EventBus.on('NpcWindowResponse', packet => {
   runInAction(() => {
     Store.npcWindow = window;
     Store.shopItems = [];
-    if (window === NPC_WINDOW_MERCHANT || window === NPC_WINDOW_MERCHANT1 || window === 2) Store.inventoryEnabled = true;
+    if (window === NPC_WINDOW_MERCHANT || window === NPC_WINDOW_MERCHANT1 || window === 2 || window === 3) {
+      Store.inventoryEnabled = true;
+    }
+    Store.chaosPreview = null;
   });
 });
 
@@ -1420,6 +1423,36 @@ EventBus.on('unknownPacket', ({ code, packet }) => {
       // Vermelho = algo mudou na troca: o meu "aceitar" é desmarcado pelo servidor.
       if (state === 2) Store.tradeMyState = 0;
     });
+  }
+});
+
+// ---------- thegame: Chaos Machine (NpcWindow 3) ----------
+
+// C1 86 ItemCraftingResult [resultado, item]. Os itens que sobraram chegam logo depois no
+// C2 31 (tipo ChaosMachine), que atualiza a grade.
+EventBus.on('ItemCraftingResult', packet => {
+  if (packet.byteLength < 4) return;
+  const result = packet.getUint8(3);
+  const messages: Record<number, string> = {
+    0: 'A combinação falhou.',
+    1: 'Combinação bem-sucedida!',
+    2: 'Zen insuficiente para a combinação.',
+    3: 'Itens demais na Chaos Machine.',
+    4: 'Nível do personagem baixo demais para essa combinação.',
+    6: 'Faltam itens para essa combinação.',
+    7: 'Itens errados: nenhuma combinação usa esses itens.',
+    8: 'Nível do item inválido para essa combinação.',
+  };
+  runInAction(() => Store.addChatMessage('system', messages[result] ?? `Combinação: resultado ${result}.`));
+});
+
+// C1 88 ItemCraftingPreviewExtended [receita, chance %, -, -, -, preço LE32] (não está nas
+// definições antigas do cliente).
+EventBus.on('unknownPacket', ({ code, packet }) => {
+  if (code === 0x88 && packet.getUint8(0) === 0xc1 && packet.byteLength >= 12) {
+    const rate = packet.getUint8(4);
+    const price = packet.getUint32(8, true);
+    runInAction(() => (Store.chaosPreview = { rate, price }));
   }
 });
 

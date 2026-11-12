@@ -471,6 +471,7 @@ export const Store = new (class _Store {
       partyWindowOpen: observable,
       answerPartyInvite: action,
       vaultMoney: observable,
+      chaosPreview: observable,
       shopItems: observable,
       pendingSellSlot: observable,
       closeNpc: action,
@@ -855,11 +856,13 @@ export const Store = new (class _Store {
   closeNpc(): void {
     if (this.npcWindow === null) return;
     const wasVault = this.npcWindow === 2; // o baú fecha com C1 82 VaultClosed
+    const wasChaos = this.npcWindow === 3; // a Chaos Machine fecha com C1 87
     this.npcWindow = null;
     this.shopItems = [];
     this.pendingSellSlot = null;
     this.pendingStorageMove = null;
-    const bytes = new Uint8Array([0xc1, 3, wasVault ? 0x82 : 0x31]);
+    this.chaosPreview = null;
+    const bytes = new Uint8Array([0xc1, 3, wasVault ? 0x82 : wasChaos ? 0x87 : 0x31]);
     this.sendToGS(new DataView(bytes.buffer));
   }
 
@@ -885,6 +888,18 @@ export const Store = new (class _Store {
 
   // ---------- thegame: baú (NpcWindow 2) ----------
 
+  /** Prévia da Chaos Machine (C1 88): chance de sucesso (%) e preço em zen. */
+  chaosPreview: { rate: number; price: number } | null = null;
+
+  /**
+   * C1 86 sem o tipo da receita: o OpenMU descobre a receita pelos itens colocados
+   * (modo das versões antigas, ChaosMixHandlerPlugIn).
+   */
+  chaosMix(): void {
+    const bytes = new Uint8Array([0xc1, 3, 0x86]);
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
   /** Zen guardado no baú (C1 81 VaultMoneyUpdate). */
   vaultMoney = 0;
   /** Movimento entre inventário e baú aguardando resposta (C3 24). */
@@ -893,7 +908,11 @@ export const Store = new (class _Store {
   /** C3 24 ItemMoveRequest entre armazéns (0 inventário, 2 baú). */
   moveBetweenStorages(fromStorage: number, fromSlot: number, toStorage: number, toSlot: number): void {
     const item =
-      fromStorage === 2 ? this.shopItems[fromSlot] : fromStorage === 1 ? this.tradeMyItems[fromSlot] : this.playerData.items[fromSlot];
+      fromStorage === 2 || fromStorage === 3
+        ? this.shopItems[fromSlot]
+        : fromStorage === 1
+          ? this.tradeMyItems[fromSlot]
+          : this.playerData.items[fromSlot];
     if (!item || this.pendingStorageMove) return;
     const bytes = new Uint8Array(19);
     bytes[0] = 0xc3;

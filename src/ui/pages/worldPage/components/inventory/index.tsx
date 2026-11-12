@@ -92,6 +92,14 @@ function onSlotRightClick(slot: number) {
     else Store.moveBetweenStorages(0, slot, 1, target);
     return;
   }
+  // thegame: com a Chaos Machine aberta, botão direito na mochila coloca o item nela (8x4).
+  if (Store.npcWindow === 3 && !isEquipmentSlot(slot)) {
+    const item = Store.playerData.items[slot];
+    const target = findFreeGridSlot(item, Store.shopItems, 8, 4);
+    if (target === null) Store.addChatMessage('system', 'A Chaos Machine está cheia.');
+    else Store.moveBetweenStorages(0, slot, 3, target);
+    return;
+  }
   // thegame: com o baú aberto, botão direito na mochila guarda o item no baú.
   if (Store.npcWindow === 2 && !isEquipmentSlot(slot)) {
     const item = Store.playerData.items[slot];
@@ -259,7 +267,9 @@ export const Inventory = observer(() => {
       <BagGrid />
       <div className="zen">Zen: {playerData.money.toLocaleString('pt-BR')}</div>
       <div className="inventory-hint">
-        {Store.trade
+        {Store.npcWindow === 3
+          ? 'Chaos Machine aberta: botão direito na mochila coloca o item nela'
+          : Store.trade
           ? 'Troca aberta: botão direito na mochila coloca o item na troca'
           : Store.npcWindow === 2
           ? 'Baú aberto: botão direito na mochila guarda o item'
