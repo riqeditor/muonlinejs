@@ -13,6 +13,7 @@ import {
   BAG_ROWS,
   FIRST_BAG_SLOT,
   bagPosition,
+  findFreeGridSlot,
   fitsInBag,
   itemSize,
 } from '../../../../../common/inventoryLayout';
@@ -81,6 +82,14 @@ function onSlotRightClick(slot: number) {
   // thegame: com a loja de um NPC aberta, clique direito na mochila vende o item.
   if (isMerchantOpen() && !isEquipmentSlot(slot)) {
     Store.sellToNpc(slot);
+    return;
+  }
+  // thegame: com o baú aberto, botão direito na mochila guarda o item no baú.
+  if (Store.npcWindow === 2 && !isEquipmentSlot(slot)) {
+    const item = Store.playerData.items[slot];
+    const target = findFreeGridSlot(item, Store.shopItems);
+    if (target === null) Store.addChatMessage('system', 'O baú está cheio.');
+    else Store.moveBetweenStorages(0, slot, 2, target);
     return;
   }
   if (isEquipmentSlot(slot)) Store.unequipItem(slot);
@@ -242,7 +251,9 @@ export const Inventory = observer(() => {
       <BagGrid />
       <div className="zen">Zen: {playerData.money.toLocaleString('pt-BR')}</div>
       <div className="inventory-hint">
-        {isMerchantOpen()
+        {Store.npcWindow === 2
+          ? 'Baú aberto: botão direito na mochila guarda o item'
+          : isMerchantOpen()
           ? 'Loja aberta: botão direito na mochila vende o item'
           : 'Arraste ou clique para mover · solte no chão para jogar fora · botão direito: equipar · Esc: cancelar'}
       </div>

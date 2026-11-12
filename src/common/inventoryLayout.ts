@@ -88,3 +88,39 @@ export function getEquipmentSlotFor(item: Item, items: (Item | null | undefined)
   }
   return slot;
 }
+
+/** thegame: grade do baú (OpenMU WarehouseSize = 120 → 8 colunas x 15 linhas). */
+export const VAULT_COLUMNS = 8;
+export const VAULT_ROWS = 15;
+
+/** Primeira posição livre para o item numa grade simples (slot = linha * colunas + coluna). */
+export function findFreeGridSlot(
+  item: Item,
+  items: (Item | null | undefined)[],
+  columns = VAULT_COLUMNS,
+  rows = VAULT_ROWS
+): number | null {
+  const used = new Array(columns * rows).fill(false);
+  items.forEach((it, slot) => {
+    if (!it) return;
+    const { w, h } = itemSize(it);
+    const c0 = slot % columns;
+    const r0 = Math.floor(slot / columns);
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
+        if (r0 + dy < rows && c0 + dx < columns) used[(r0 + dy) * columns + c0 + dx] = true;
+      }
+    }
+  });
+  const { w, h } = itemSize(item);
+  for (let r = 0; r + h <= rows; r++) {
+    for (let c = 0; c + w <= columns; c++) {
+      let ok = true;
+      for (let dy = 0; dy < h && ok; dy++) {
+        for (let dx = 0; dx < w && ok; dx++) if (used[(r + dy) * columns + c + dx]) ok = false;
+      }
+      if (ok) return r * columns + c;
+    }
+  }
+  return null;
+}

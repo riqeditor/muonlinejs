@@ -984,6 +984,10 @@ function onItemMoveResponse(packet: DataView) {
     pending
   );
 
+  // thegame: movimento entre inventário e baú (armazém 0 e 2).
+  const storageMove = Store.pendingStorageMove;
+  Store.pendingStorageMove = null;
+
   if (packet.byteLength < 5 || packet.getUint8(3) === 0xff) {
     runInAction(() => Store.addChatMessage('system', 'Não foi possível mover o item.'));
     return;
@@ -991,7 +995,26 @@ function onItemMoveResponse(packet: DataView) {
 
   const storage = packet.getUint8(3);
   const targetSlot = packet.getUint8(4);
-  if (storage !== 0) return; // só o inventário por enquanto
+
+  if (storageMove) {
+    let moved: Item | null = null;
+    try {
+      moved = ItemSerializer.DeserializeItem(new Uint8Array(packet.buffer, packet.byteOffset + 5, packet.byteLength - 5));
+    } catch (error) {
+      console.error('Item movido não pôde ser lido', error);
+    }
+    runInAction(() => {
+      if (storageMove.fromStorage === 2) Store.shopItems[storageMove.fromSlot] = null;
+      else Store.playerData.items[storageMove.fromSlot] = null as unknown as Item;
+      if (moved) {
+        if (storage === 2) Store.shopItems[targetSlot] = moved;
+        else Store.playerData.items[targetSlot] = moved;
+      }
+    });
+    Store.syncPlayerAppearance();
+    return;
+  }
+  if (storage !== 0) return;
 
   let parsed: Item;
   try {
@@ -1163,7 +1186,7 @@ EventBus.on('NpcWindowResponse', packet => {
   runInAction(() => {
     Store.npcWindow = window;
     Store.shopItems = [];
-    if (window === NPC_WINDOW_MERCHANT || window === NPC_WINDOW_MERCHANT1) Store.inventoryEnabled = true;
+    if (window === NPC_WINDOW_MERCHANT || window === NPC_WINDOW_MERCHANT1 || window === 2) Store.inventoryEnabled = true;
   });
 });
 
@@ -1224,6 +1247,27 @@ EventBus.on('NpcItemSellResult', packet => {
     }
   });
   Store.syncPlayerAppearance();
+});
+
+// C1 81 VaultMoneyUpdate [sucesso, zen do baú LE32, zen do inventário LE32].
+EventBus.on('VaultMoneyUpdate', packet => {
+  if (packet.byteLength < 12) return;
+  const success = packet.getUint8(3) !== 0;
+  runInAction(() => {
+    Store.vaultMoney = packet.getUint32(4, true);
+    Store.playerData.money = packet.getUint32(8, true);
+    if (!success) Store.addChatMessage('system', 'Não foi possível mover o zen.');
+  });
+});
+
+// C1 82 VaultClosed: o servidor fechou o baú.
+EventBus.on('VaultClosed', () => {
+  runInAction(() => {
+    if (Store.npcWindow === 2) {
+      Store.npcWindow = null;
+      Store.shopItems = [];
+    }
+  });
 });
 
 // C1 34 ItemRepairResponse [?, zen LE32] — não está nas definições antigas do cliente.

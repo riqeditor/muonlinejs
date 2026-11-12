@@ -454,6 +454,7 @@ export const Store = new (class _Store {
       world: observable,
       characterInfoEnabled: observable,
       npcWindow: observable,
+      vaultMoney: observable,
       shopItems: observable,
       pendingSellSlot: observable,
       closeNpc: action,
@@ -837,10 +838,12 @@ export const Store = new (class _Store {
   /** C1 31 CloseNpcRequest: fecha a janela do NPC (o servidor libera o jogador). */
   closeNpc(): void {
     if (this.npcWindow === null) return;
+    const wasVault = this.npcWindow === 2; // o baú fecha com C1 82 VaultClosed
     this.npcWindow = null;
     this.shopItems = [];
     this.pendingSellSlot = null;
-    const bytes = new Uint8Array([0xc1, 3, 0x31]);
+    this.pendingStorageMove = null;
+    const bytes = new Uint8Array([0xc1, 3, wasVault ? 0x82 : 0x31]);
     this.sendToGS(new DataView(bytes.buffer));
   }
 
@@ -862,6 +865,47 @@ export const Store = new (class _Store {
   repairItem(slot: number): void {
     const bytes = new Uint8Array([0xc1, 5, 0x34, slot, 0]);
     this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  // ---------- thegame: baú (NpcWindow 2) ----------
+
+  /** Zen guardado no baú (C1 81 VaultMoneyUpdate). */
+  vaultMoney = 0;
+  /** Movimento entre inventário e baú aguardando resposta (C3 24). */
+  pendingStorageMove: { fromStorage: number; fromSlot: number; toStorage: number; toSlot: number } | null = null;
+
+  /** C3 24 ItemMoveRequest entre armazéns (0 inventário, 2 baú). */
+  moveBetweenStorages(fromStorage: number, fromSlot: number, toStorage: number, toSlot: number): void {
+    const item = fromStorage === 2 ? this.shopItems[fromSlot] : this.playerData.items[fromSlot];
+    if (!item || this.pendingStorageMove) return;
+    const bytes = new Uint8Array(19);
+    bytes[0] = 0xc3;
+    bytes[1] = 19;
+    bytes[2] = 0x24;
+    bytes[3] = fromStorage;
+    bytes[4] = fromSlot;
+    try {
+      ItemSerializer.SerializeItem(bytes.subarray(5, 17), item);
+    } catch {
+      // o servidor só usa os slots
+    }
+    bytes[17] = toStorage;
+    bytes[18] = toSlot;
+    this.pendingStorageMove = { fromStorage, fromSlot, toStorage, toSlot };
+    this.sendToGS(new DataView(bytes.buffer));
+  }
+
+  /** C1 81 VaultMoveMoneyRequest: 0 = guardar no baú, 1 = tirar do baú. */
+  moveVaultMoney(direction: 0 | 1, amount: number): void {
+    if (!(amount > 0)) return;
+    const bytes = new Uint8Array(8);
+    const view = new DataView(bytes.buffer);
+    bytes[0] = 0xc1;
+    bytes[1] = 8;
+    bytes[2] = 0x81;
+    bytes[3] = direction;
+    view.setUint32(4, Math.floor(amount), true);
+    this.sendToGS(view);
   }
 
   /** C3 26 ConsumeItemRequest: usa o item do slot (poção, antídoto…). */
